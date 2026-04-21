@@ -1,14 +1,16 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, useParams } from 'react-router';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { TeacherDashboardPage } from './pages/TeacherDashboardPage';
+import { AdminPage } from './pages/AdminPage';
 import { GlobalPretestPage } from './pages/GlobalPretestPage';
 import { GlobalPosttestPage } from './pages/GlobalPosttestPage';
+import { LessonIntroPage } from './pages/LessonIntroPage';
 import { LessonPretestPage } from './pages/LessonPretestPage';
 import { LessonPage } from './pages/LessonPage';
 import { EvaluationPage } from './pages/EvaluationPage';
+import { ReflectionPage } from './pages/ReflectionPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 export const router = createBrowserRouter([
@@ -27,23 +29,23 @@ export const router = createBrowserRouter([
   {
     path: '/dashboard',
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="student">
         <DashboardPage />
       </ProtectedRoute>
     ),
   },
   {
-    path: '/teacher-dashboard',
+    path: '/admin',
     element: (
-      <ProtectedRoute>
-        <TeacherDashboardPage />
+      <ProtectedRoute requiredRole="admin">
+        <AdminPage />
       </ProtectedRoute>
     ),
   },
   {
     path: '/global-pretest',
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="student">
         <GlobalPretestPage />
       </ProtectedRoute>
     ),
@@ -51,33 +53,75 @@ export const router = createBrowserRouter([
   {
     path: '/global-posttest',
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRole="student">
         <GlobalPosttestPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/lesson-intro/:lessonId',
+    element: (
+      <ProtectedRoute requiredRole="student">
+        <LessonIntroPageWrapper />
       </ProtectedRoute>
     ),
   },
   {
     path: '/lesson-pretest/:lessonId',
     element: (
-      <ProtectedRoute>
-        <LessonPretestPage />
+      <ProtectedRoute requiredRole="student">
+        <LessonPretestPageWrapper />
       </ProtectedRoute>
     ),
   },
   {
     path: '/lesson/:lessonId',
     element: (
-      <ProtectedRoute>
-        <LessonPage />
+      <ProtectedRoute requiredRole="student">
+        <LessonPageWrapper />
       </ProtectedRoute>
     ),
   },
   {
     path: '/evaluation/:lessonId',
     element: (
-      <ProtectedRoute>
-        <EvaluationPage />
+      <ProtectedRoute requiredRole="student">
+        <EvaluationPageWrapper />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/reflection/:lessonId',
+    element: (
+      <ProtectedRoute requiredRole="student">
+        <ReflectionPageWrapper />
       </ProtectedRoute>
     ),
   },
 ]);
+
+function LessonIntroPageWrapper() {
+  const { lessonId } = useParams();
+  return <LessonIntroPage key={lessonId} />;
+}
+
+function LessonPretestPageWrapper() {
+  const { lessonId } = useParams();
+  return <LessonPretestPage key={lessonId} />;
+}
+
+function LessonPageWrapper() {
+  const { lessonId } = useParams();
+  return <LessonPage key={lessonId} />;
+}
+
+function EvaluationPageWrapper() {
+  const { lessonId } = useParams();
+  return <EvaluationPage key={lessonId} />;
+}
+
+function ReflectionPageWrapper() {
+  const { lessonId } = useParams();
+  return <ReflectionPage key={lessonId} />;
+}
+

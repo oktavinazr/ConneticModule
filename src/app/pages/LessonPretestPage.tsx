@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, Link } from 'react-router';
 import { getCurrentUser } from '../utils/auth';
 import { getLessonProgress, savePretestResult, isLessonUnlocked } from '../utils/progress';
 import { lessons } from '../data/lessons';
 import { TestPage } from '../components/TestPage';
-import { Link } from 'react-router';
 import { BookOpen, Lock } from 'lucide-react';
 
 export function LessonPretestPage() {
@@ -30,7 +29,7 @@ export function LessonPretestPage() {
     }
 
     if (!unlocked) {
-      // Don't allow access if not unlocked
+      // Jangan izinkan akses jika belum terbuka
       return;
     }
   }, [user, lesson, unlocked, navigate]);
@@ -39,28 +38,36 @@ export function LessonPretestPage() {
 
   if (!unlocked) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <header className="bg-white shadow-sm">
+      <div className="min-h-screen bg-[#F0F3FA]">
+        <header className="sticky top-0 z-50 w-full border-b border-[#D5DEEF] bg-white/90 shadow-sm backdrop-blur-md transition-all">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-              <Link to="/dashboard" className="flex items-center gap-2">
-                <BookOpen className="w-8 h-8 text-indigo-600" />
-                <span className="text-xl text-indigo-900">CONNETIC Module</span>
-              </Link>
+            <div className="flex min-h-[76px] items-center justify-between gap-6">
+              <div className="flex min-w-0 items-center gap-4">
+                <Link to="/dashboard" className="flex items-center gap-3">
+                  <div className="hidden min-w-0 sm:block">
+                    <p className="truncate text-lg font-bold text-[#395886]">CONNETIC Module</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#628ECB]">Interactive Learning</p>
+                  </div>
+                </Link>
+                <div className="h-8 w-px bg-[#D5DEEF] hidden sm:block" />
+                <span className="hidden sm:block text-sm font-bold text-[#628ECB] uppercase tracking-widest">Pre-Test Pertemuan</span>
+              </div>
             </div>
           </div>
         </header>
 
         <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-            <Lock className="w-20 h-20 text-gray-400 mx-auto mb-4" />
-            <h1 className="text-gray-900 mb-4">{lesson.title} Terkunci</h1>
-            <p className="text-lg text-gray-600 mb-6">
+          <div className="bg-white rounded-[2rem] shadow-lg p-8 text-center border border-[#D5DEEF]">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 mx-auto mb-6">
+              <Lock className="w-10 h-10 text-gray-400" />
+            </div>
+            <h1 className="text-2xl font-bold text-[#395886] mb-3">{lesson.title} Terkunci</h1>
+            <p className="text-[#395886]/70 mb-8 font-medium">
               Selesaikan pertemuan sebelumnya terlebih dahulu untuk membuka pertemuan ini.
             </p>
             <Link
               to="/dashboard"
-              className="inline-block bg-indigo-600 text-white px-8 py-3 rounded-lg hover:bg-indigo-700 transition-colors"
+              className="inline-block bg-[#628ECB] text-white px-8 py-3 rounded-2xl hover:bg-[#395886] transition-colors font-bold shadow-lg"
             >
               Kembali ke Dashboard
             </Link>
@@ -73,7 +80,7 @@ export function LessonPretestPage() {
   const handleComplete = (score: number, answers: number[]) => {
     savePretestResult(user!.id, lessonId!, score, answers);
     setProgress(getLessonProgress(user!.id, lessonId!));
-    // Will redirect to lesson stages after reviewing results
+    // Akan mengarahkan ke tahapan pertemuan setelah meninjau hasil
   };
 
   const existingAnswers = progress.pretestCompleted
@@ -83,15 +90,22 @@ export function LessonPretestPage() {
   return (
     <TestPage
       title={`Pre-Test ${lesson.title}`}
-      description={`Tes awal untuk mengukur pemahaman Anda tentang ${lesson.topic}`}
+      description={`Tes awal untuk mengukur pemahaman awal Anda sebelum mempelajari ${lesson.topic}.`}
       questions={lesson.pretest.questions}
       onComplete={handleComplete}
-      backPath={`/lesson/${lessonId}`}
+      backPath={progress.pretestCompleted ? `/lesson/${lessonId}` : `/lesson-intro/${lessonId}`}
       showResults={progress.pretestCompleted}
       existingAnswers={existingAnswers}
       existingScore={progress.pretestScore}
-      duration={10} // 10 minutes for lesson pretest
+      duration={10}
       isLessonPretest={true}
+      lessonFlow={{
+        step: 2,
+        lessonId: lessonId!,
+        pretestCompleted: progress.pretestCompleted,
+        allStagesCompleted: progress.completedStages.length === lesson.stages.length,
+        posttestCompleted: progress.posttestCompleted,
+      }}
     />
   );
 }

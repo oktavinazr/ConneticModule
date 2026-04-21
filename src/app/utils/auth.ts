@@ -1,42 +1,67 @@
-// Authentication utilities using localStorage
 export interface User {
   id: string;
   name: string;
+  username: string;
   email: string;
+  gender: 'Laki-laki' | 'Perempuan';
   class: string;
   nis: string;
-  role: 'student' | 'teacher';
+  role: 'student' | 'admin';
   registeredAt?: string;
 }
 
+interface StoredUser extends User {
+  password: string;
+}
+
+const ADMIN_CREDENTIALS = {
+  id: 'admin-root',
+  username: 'admin',
+  email: 'admin@connetic.local',
+  password: 'Admin123',
+  name: 'Administrator',
+  gender: 'Laki-laki' as const,
+  class: '',
+  nis: '',
+  role: 'admin' as const,
+};
+
 export const register = (
   name: string,
+  username: string,
   email: string,
   password: string,
+  gender: 'Laki-laki' | 'Perempuan',
   classRoom: string,
-  nis: string,
-  role: 'student' | 'teacher'
+  nis: string
 ): boolean => {
-  const users = JSON.parse(localStorage.getItem('users') || '[]');
+  const users: StoredUser[] = JSON.parse(localStorage.getItem('users') || '[]');
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedUsername = username.trim().toLowerCase();
+  const normalizedNis = nis.trim();
 
-  // Check if email already exists
-  if (users.some((u: User & { password: string }) => u.email === email)) {
+  if (users.some((u) => u.email.toLowerCase() === normalizedEmail)) {
     return false;
   }
 
-  // Check if NIS already exists (only for students)
-  if (role === 'student' && users.some((u: User & { password: string }) => u.nis === nis)) {
+  if (users.some((u) => u.username.toLowerCase() === normalizedUsername)) {
     return false;
   }
 
-  const newUser = {
+  if (users.some((u) => u.nis === normalizedNis)) {
+    return false;
+  }
+
+  const newUser: StoredUser = {
     id: Date.now().toString(),
-    name,
-    email,
+    name: name.trim(),
+    username: username.trim(),
+    email: normalizedEmail,
     password,
-    class: classRoom,
-    nis: role === 'student' ? nis : '', // NIS empty for teachers
-    role,
+    gender,
+    class: classRoom.trim(),
+    nis: normalizedNis,
+    role: 'student',
     registeredAt: new Date().toISOString(),
   };
 
@@ -45,17 +70,42 @@ export const register = (
   return true;
 };
 
-export const login = (email: string, password: string): User | null => {
-  const users = JSON.parse(localStorage.getItem('users') || '[]');
-  const user = users.find((u: User & { password: string }) => u.email === email && u.password === password);
+export const login = (identifier: string, password: string): User | null => {
+  const normalizedIdentifier = identifier.trim().toLowerCase();
 
-  if (user) {
-    const { password: _, ...userWithoutPassword } = user;
-    localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
-    return userWithoutPassword;
+  if (
+    (normalizedIdentifier === ADMIN_CREDENTIALS.username || normalizedIdentifier === ADMIN_CREDENTIALS.email) &&
+    password === ADMIN_CREDENTIALS.password
+  ) {
+    const adminUser: User = {
+      id: ADMIN_CREDENTIALS.id,
+      username: ADMIN_CREDENTIALS.username,
+      email: ADMIN_CREDENTIALS.email,
+      name: ADMIN_CREDENTIALS.name,
+      gender: ADMIN_CREDENTIALS.gender,
+      class: '',
+      nis: '',
+      role: 'admin',
+      registeredAt: new Date().toISOString(),
+    };
+    localStorage.setItem('currentUser', JSON.stringify(adminUser));
+    return adminUser;
   }
 
-  return null;
+  const users: StoredUser[] = JSON.parse(localStorage.getItem('users') || '[]');
+  const user = users.find(
+    (u) =>
+      (u.email.toLowerCase() === normalizedIdentifier || u.username.toLowerCase() === normalizedIdentifier) &&
+      u.password === password
+  );
+
+  if (!user) {
+    return null;
+  }
+
+  const { password: _password, ...userWithoutPassword } = user;
+  localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
+  return userWithoutPassword;
 };
 
 export const logout = () => {
@@ -71,40 +121,60 @@ export const isAuthenticated = (): boolean => {
   return getCurrentUser() !== null;
 };
 
-export const updateUser = (userId: string, updates: Partial<Omit<User, 'id' | 'registeredAt'>>): boolean => {
-  const users = JSON.parse(localStorage.getItem('users') || '[]');
-  const userIndex = users.findIndex((u: User & { password: string }) => u.id === userId);
+export const updateUser = (
+  userId: string,
+  updates: Partial<Omit<User, 'id' | 'registeredAt' | 'role'>>
+): boolean => {
+  if (userId === ADMIN_CREDENTIALS.id) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return false;
+    localStorage.setItem(
+      'currentUser',
+      JSON.stringify({
+        ...currentUser,
+        ...updates,
+      })
+    );
+    return true;
+  }
+
+  const users: StoredUser[] = JSON.parse(localStorage.getItem('users') || '[]');
+  const userIndex = users.findIndex((u) => u.id === userId);
 
   if (userIndex === -1) {
     return false;
   }
 
-  // Check if email is being changed and already exists
-  if (updates.email && updates.email !== users[userIndex].email) {
-    if (users.some((u: User & { password: string }, idx: number) => u.email === updates.email && idx !== userIndex)) {
+  if (updates.email && updates.email.trim().toLowerCase() !== users[userIndex].email.toLowerCase()) {
+    if (users.some((u, idx) => u.email.toLowerCase() === updates.email!.trim().toLowerCase() && idx !== userIndex)) {
       return false;
     }
   }
 
-  // Check if NIS is being changed and already exists (only for students)
-  if (updates.nis && updates.nis !== users[userIndex].nis) {
-    if (
-      users.some(
-        (u: User & { password: string }, idx: number) => u.nis === updates.nis && idx !== userIndex && u.role === 'student'
-      )
-    ) {
+  if (updates.username && updates.username.trim().toLowerCase() !== users[userIndex].username.toLowerCase()) {
+    if (users.some((u, idx) => u.username.toLowerCase() === updates.username!.trim().toLowerCase() && idx !== userIndex)) {
       return false;
     }
   }
 
-  // Update user
-  users[userIndex] = { ...users[userIndex], ...updates };
+  if (updates.nis && updates.nis.trim() !== users[userIndex].nis) {
+    if (users.some((u, idx) => u.nis === updates.nis!.trim() && idx !== userIndex)) {
+      return false;
+    }
+  }
+
+  users[userIndex] = {
+    ...users[userIndex],
+    ...updates,
+    email: updates.email ? updates.email.trim().toLowerCase() : users[userIndex].email,
+    username: updates.username ? updates.username.trim() : users[userIndex].username,
+    nis: updates.nis ? updates.nis.trim() : users[userIndex].nis,
+  };
   localStorage.setItem('users', JSON.stringify(users));
 
-  // Update current user if it's the same user
   const currentUser = getCurrentUser();
   if (currentUser && currentUser.id === userId) {
-    const { password: _, ...userWithoutPassword } = users[userIndex];
+    const { password: _password, ...userWithoutPassword } = users[userIndex];
     localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
   }
 
@@ -112,11 +182,22 @@ export const updateUser = (userId: string, updates: Partial<Omit<User, 'id' | 'r
 };
 
 export const getAllStudents = (): User[] => {
-  const users = JSON.parse(localStorage.getItem('users') || '[]');
+  const users: StoredUser[] = JSON.parse(localStorage.getItem('users') || '[]');
   return users
-    .filter((u: User) => u.role === 'student')
-    .map((u: User & { password: string }) => {
-      const { password: _, ...userWithoutPassword } = u;
+    .filter((u) => u.role === 'student')
+    .map((u) => {
+      const { password: _password, ...userWithoutPassword } = u;
       return userWithoutPassword;
     });
+};
+
+export const isAdminUser = (user: User | null): boolean => {
+  return user?.role === 'admin';
+};
+
+export const getAdminCredentialsHint = () => {
+  return {
+    username: ADMIN_CREDENTIALS.username,
+    password: ADMIN_CREDENTIALS.password,
+  };
 };

@@ -35,7 +35,7 @@ export function TeacherDashboardPage() {
   const [sortBy, setSortBy] = useState<'name' | 'progress' | 'nis'>('name');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  // Redirect if not authenticated
+  // Arahkan ulang jika belum terautentikasi
   if (!user) {
     navigate('/login');
     return null;
@@ -46,10 +46,10 @@ export function TeacherDashboardPage() {
     navigate('/');
   };
 
-  // Get all students
+  // Ambil semua data siswa
   const students = getAllStudents();
 
-  // Calculate progress for all students
+  // Hitung progres untuk semua siswa
   const studentsProgress: StudentProgress[] = students.map((student) => {
     const progress = getAllProgress(student.id);
     const globalTests = getGlobalTestProgress(student.id);
@@ -66,10 +66,10 @@ export function TeacherDashboardPage() {
       };
     });
 
-    // Calculate overall progress
+    // Hitung progres keseluruhan
     const totalSteps =
-      2 + // global pretest & posttest
-      Object.values(lessons).length * 9; // Each lesson: pretest + 7 stages + posttest
+      2 + // pretest & posttest global
+      Object.values(lessons).length * 9; // Setiap pertemuan: pretest + 7 tahap + posttest
     let completedSteps = 0;
 
     if (globalTests.globalPretestCompleted) completedSteps += 1;
@@ -98,7 +98,7 @@ export function TeacherDashboardPage() {
     };
   });
 
-  // Calculate statistics
+  // Hitung statistik
   const totalStudents = students.length;
   const activeStudents = studentsProgress.filter((sp) => sp.overallProgress > 0).length;
   const averageProgress =
@@ -109,7 +109,7 @@ export function TeacherDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F0F3FA]">
-      {/* Header */}
+      {/* Kepala */}
       <header className="bg-white shadow-sm border-b border-[#D5DEEF]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
@@ -140,14 +140,14 @@ export function TeacherDashboardPage() {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Konten Utama */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-[#395886] mb-4">Dashboard Guru</h1>
           <p className="text-lg text-[#395886]/70">Monitoring Progres dan Hasil Belajar Siswa</p>
         </div>
 
-        {/* Statistics Cards */}
+        {/* Kartu Statistik */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-[#D5DEEF]">
             <div className="flex items-center justify-between">
@@ -190,7 +190,7 @@ export function TeacherDashboardPage() {
           </div>
         </div>
 
-        {/* Students Table */}
+        {/* Tabel Siswa */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden border-2 border-[#D5DEEF]">
           <div className="p-6 bg-gradient-to-r from-[#628ECB] to-[#8B5CF6]">
             <h2 className="text-white font-bold text-xl">Daftar Siswa</h2>
@@ -279,12 +279,12 @@ export function TeacherDashboardPage() {
         </div>
       </main>
 
-      {/* Detail Modal */}
+      {/* Modal Detail */}
       {selectedStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setSelectedStudent(null)} />
           <div className="relative bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col border-2 border-[#D5DEEF]">
-            {/* Header */}
+            {/* Kepala */}
             <div className="bg-gradient-to-r from-[#628ECB] to-[#8B5CF6] p-6 text-white flex-shrink-0">
               <h2 className="text-2xl font-bold">{selectedStudent.student.name}</h2>
               <p className="text-white/80">
@@ -292,9 +292,9 @@ export function TeacherDashboardPage() {
               </p>
             </div>
 
-            {/* Content */}
+            {/* Konten */}
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
-              {/* Global Tests */}
+              {/* Tes Global */}
               <div>
                 <h3 className="text-[#395886] font-bold text-lg mb-4">Test Umum</h3>
                 <div className="grid md:grid-cols-2 gap-4">
@@ -317,7 +317,7 @@ export function TeacherDashboardPage() {
                 </div>
               </div>
 
-              {/* Lessons Progress */}
+              {/* Progress Pertemuan */}
               <div>
                 <h3 className="text-[#395886] font-bold text-lg mb-4">Progress Pertemuan</h3>
                 <div className="space-y-4">
@@ -354,7 +354,7 @@ export function TeacherDashboardPage() {
               </div>
             </div>
 
-            {/* Footer */}
+            {/* Kaki */}
             <div className="bg-[#F0F3FA] px-6 py-4 flex justify-end flex-shrink-0 border-t-2 border-[#D5DEEF]">
               <button
                 onClick={() => setSelectedStudent(null)}
@@ -367,13 +367,13 @@ export function TeacherDashboardPage() {
         </div>
       )}
 
-      {/* Profile Modal */}
+      {/* Modal Profil */}
       <ProfileModal
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
         user={user!}
         onUpdate={() => {
-          // Force re-render by reloading
+          // Paksa render ulang dengan memuat ulang halaman
           window.location.reload();
         }}
       />

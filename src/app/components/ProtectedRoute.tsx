@@ -1,10 +1,20 @@
 import { ReactNode } from 'react';
 import { Navigate } from 'react-router';
-import { isAuthenticated } from '../utils/auth';
+import { getCurrentUser, isAuthenticated } from '../utils/auth';
 
-export function ProtectedRoute({ children }: { children: ReactNode }) {
+interface ProtectedRouteProps {
+  children: ReactNode;
+  requiredRole?: 'student' | 'admin';
+}
+
+export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
+  }
+
+  const currentUser = getCurrentUser();
+  if (requiredRole && currentUser?.role !== requiredRole) {
+    return <Navigate to={currentUser?.role === 'admin' ? '/admin' : '/dashboard'} replace />;
   }
 
   return <>{children}</>;

@@ -26,7 +26,7 @@ export function EvaluationPage() {
       return;
     }
 
-    // Check if all stages completed
+    // Cek apakah semua tahap sudah selesai
     if (progress.completedStages.length < lesson.stages.length) {
       navigate(`/lesson/${lessonId}`);
     }
@@ -37,7 +37,7 @@ export function EvaluationPage() {
   const handleComplete = (score: number, answers: number[]) => {
     savePosttestResult(user!.id, lessonId!, score, answers);
     setProgress(getLessonProgress(user!.id, lessonId!));
-    // Don't auto-redirect, let user review
+    // Jangan otomatis arahkan ulang, biarkan pengguna meninjau
   };
 
   const existingAnswers = progress.posttestCompleted
@@ -51,10 +51,18 @@ export function EvaluationPage() {
       questions={lesson.posttest.questions}
       onComplete={handleComplete}
       backPath="/dashboard"
+      reflectionPath={`/reflection/${lessonId}`}
       showResults={progress.posttestCompleted}
       existingAnswers={existingAnswers}
       existingScore={progress.posttestScore}
-      duration={15} // 15 minutes for lesson posttest
+      duration={15} // 15 menit untuk posttest pertemuan
+      lessonFlow={{
+        step: 4,
+        lessonId: lessonId!,
+        pretestCompleted: progress.pretestCompleted,
+        allStagesCompleted: progress.completedStages.length === lesson.stages.length,
+        posttestCompleted: progress.posttestCompleted,
+      }}
     />
   );
 }

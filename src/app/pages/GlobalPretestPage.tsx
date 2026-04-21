@@ -19,7 +19,6 @@ export function GlobalPretestPage() {
   const handleComplete = (score: number, answers: number[]) => {
     saveGlobalPretestResult(user!.id, score, answers);
     setProgress(getGlobalTestProgress(user!.id));
-    // Don't auto-redirect, let user review
   };
 
   const existingAnswers = progress.globalPretestCompleted
@@ -36,7 +35,13 @@ export function GlobalPretestPage() {
       showResults={progress.globalPretestCompleted}
       existingAnswers={existingAnswers}
       existingScore={progress.globalPretestScore}
-      duration={20} // 20 minutes for global pretest
+      duration={20}
+      instructions={[
+        'Kerjakan secara mandiri tanpa membuka materi pembelajaran.',
+        'Baca seluruh opsi jawaban lalu pilih satu jawaban yang paling tepat.',
+        'Gunakan hasil tes ini sebagai gambaran pemahaman awal sebelum memulai materi.',
+      ]}
+      durationNote="Waktu pengerjaan maksimal 20 menit. Setelah waktu habis, jawaban yang sudah dipilih akan diproses otomatis."
     />
   );
 }
