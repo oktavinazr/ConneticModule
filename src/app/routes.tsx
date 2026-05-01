@@ -1,4 +1,4 @@
-import { createBrowserRouter, useParams } from 'react-router';
+import { createBrowserRouter, useParams, Navigate } from 'react-router';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -11,6 +11,8 @@ import { LessonPretestPage } from './pages/LessonPretestPage';
 import { LessonPage } from './pages/LessonPage';
 import { EvaluationPage } from './pages/EvaluationPage';
 import { ReflectionPage } from './pages/ReflectionPage';
+import { ReviewPage } from './pages/ReviewPage';
+import { AnswerResultsPage } from './pages/admin/AnswerResultsPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 export const router = createBrowserRouter([
@@ -41,6 +43,26 @@ export const router = createBrowserRouter([
         <AdminPage />
       </ProtectedRoute>
     ),
+  },
+  {
+    path: '/admin/results/:testType',
+    element: (
+      <ProtectedRoute requiredRole="admin">
+        <AnswerResultsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/admin/results/:testType/:lessonId',
+    element: (
+      <ProtectedRoute requiredRole="admin">
+        <AnswerResultsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/teacher',
+    element: <Navigate to="/admin" replace />,
   },
   {
     path: '/global-pretest',
@@ -98,6 +120,14 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
+  {
+    path: '/review/:lessonId',
+    element: (
+      <ProtectedRoute requiredRole="student">
+        <ReviewPageWrapper />
+      </ProtectedRoute>
+    ),
+  },
 ]);
 
 function LessonIntroPageWrapper() {
@@ -125,3 +155,7 @@ function ReflectionPageWrapper() {
   return <ReflectionPage key={lessonId} />;
 }
 
+function ReviewPageWrapper() {
+  const { lessonId } = useParams();
+  return <ReviewPage key={lessonId} />;
+}

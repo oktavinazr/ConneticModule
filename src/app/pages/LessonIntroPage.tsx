@@ -14,25 +14,31 @@ import { getCurrentUser } from '../utils/auth';
 import { isLessonUnlocked, getLessonProgress } from '../utils/progress';
 import { lessons, lessonMainObjectives } from '../data/lessons';
 import { LessonFlowSidebar } from '../components/LessonFlowSidebar';
+import { Logo } from '../components/layout/Logo';
 
 export function LessonIntroPage() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const [user] = useState(getCurrentUser);
   const lesson = lessonId ? lessons[lessonId] : null;
-  const unlocked = lessonId ? isLessonUnlocked(user!.id, lessonId) : false;
+  const [unlocked, setUnlocked] = useState(false);
+  const [progress, setProgress] = useState({
+    lessonId: lessonId ?? '',
+    userId: user?.id ?? '',
+    pretestCompleted: false,
+    completedStages: [] as number[],
+    posttestCompleted: false,
+    answers: {} as Record<string, any>,
+    stageAttempts: {} as Record<string, number>,
+    stageSuccess: {} as Record<string, boolean>,
+  });
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    if (!lesson) {
-      navigate('/dashboard');
-    }
-  }, [user, lesson, navigate]);
-
-  const [progress] = useState(() => getLessonProgress(user!.id, lessonId!));
+    if (!user) { navigate('/login'); return; }
+    if (!lesson) { navigate('/dashboard'); return; }
+    isLessonUnlocked(user.id, lessonId!).then(setUnlocked);
+    getLessonProgress(user.id, lessonId!).then(setProgress);
+  }, [user, lesson, lessonId, navigate]);
 
   const fullyCompleted =
     progress.pretestCompleted &&
@@ -43,25 +49,26 @@ export function LessonIntroPage() {
 
   // Header bersama
   const header = (
-    <header className="sticky top-0 z-50 w-full border-b border-[#D5DEEF] bg-white/90 shadow-sm backdrop-blur-md transition-all">
+    <header className="sticky top-0 z-50 w-full border-b border-[#C8D8F0] bg-white/95 shadow-md backdrop-blur-md transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex min-h-[76px] items-center justify-between gap-6">
           <div className="flex min-w-0 items-center gap-4">
             <Link to="/dashboard" className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#628ECB] shadow-sm">
-                <BookOpen className="h-6 w-6 text-white" />
-              </div>
               <div className="hidden sm:block min-w-0">
-                <p className="truncate text-lg font-bold text-[#395886]">CONNETIC Module</p>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#628ECB]">Interactive Learning</p>
+                <Logo />
+              </div>
+              <div className="sm:hidden">
+                <Logo size="sm" />
               </div>
             </Link>
             <div className="h-8 w-px bg-[#D5DEEF] hidden sm:block" />
-            <span className="hidden sm:block text-sm font-bold text-[#628ECB] uppercase tracking-widest">{lesson.title}</span>
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-[#628ECB]/10 px-3 py-1 text-xs font-bold text-[#628ECB] uppercase tracking-widest border border-[#628ECB]/20">
+              {lesson.title}
+            </span>
           </div>
           <Link
             to="/dashboard"
-            className="flex items-center gap-2 text-[#395886] hover:text-[#628ECB] transition-colors text-sm font-semibold"
+            className="flex items-center gap-2 text-[#395886] hover:text-[#628ECB] transition-colors text-sm font-bold"
           >
             <ChevronLeft className="w-4 h-4" />
             Dashboard
@@ -121,7 +128,7 @@ export function LessonIntroPage() {
           </div>
 
           <div className="space-y-4">
-            {/* Tujuan Pembelajaran */}
+            {/* Tujuan Pembelajaran Utama */}
             <div className="bg-white rounded-[2rem] border border-[#D5DEEF] shadow-sm overflow-hidden">
               <div className="flex items-center gap-3 border-b border-[#628ECB]/10 bg-[#628ECB]/5 px-6 py-4">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white shadow-sm">

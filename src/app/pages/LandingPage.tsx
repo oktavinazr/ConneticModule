@@ -1,3 +1,4 @@
+import React from 'react';
 import { Link } from 'react-router';
 import {
   ArrowRight,
@@ -20,6 +21,7 @@ import {
 import { MobileSidebar } from '../components/MobileSidebar';
 import { useEffect, useState } from 'react';
 import profileImg from '../../assets/images/Profil.jpeg';
+import { Logo } from '../components/layout/Logo';
 
 const desktopContainer = 'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8';
 
@@ -94,12 +96,11 @@ export function LandingPage() {
           <div className="flex min-h-[76px] items-center justify-between gap-4">
             {/* Logo – selalu di kiri */}
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#628ECB] shadow-sm">
-                <BookOpen className="h-6 w-6 text-white" />
+              <div className="hidden sm:block">
+                <Logo />
               </div>
-              <div className="hidden min-w-0 sm:block">
-                <p className="truncate text-lg font-bold">CONNETIC Module</p>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#628ECB]">Interactive Learning</p>
+              <div className="sm:hidden">
+                <Logo size="sm" />
               </div>
             </div>
 
@@ -146,113 +147,118 @@ export function LandingPage() {
 
       {/* ── BERANDA ─────────────────────────────────────────────────────────── */}
       <section id="home" className="relative flex min-h-[calc(100vh-76px)] scroll-mt-20 items-center overflow-hidden py-16 lg:py-0">
-        {/* Blob dekoratif */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_0%_40%,_rgba(98,142,203,0.14),_transparent),radial-gradient(ellipse_50%_50%_at_100%_80%,_rgba(16,185,129,0.10),_transparent)]" />
-        <div className="absolute -left-24 top-1/3 h-80 w-80 rounded-full bg-[#628ECB]/8 blur-3xl" />
-        <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-[#10B981]/6 blur-3xl" />
+        {/* Background Accents — Premium Look */}
+        <div className="absolute inset-0 bg-[#F0F3FA]" />
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#395886 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+        
+        {/* Decorative Blobs */}
+        <div className="absolute -left-24 top-1/4 h-[500px] w-[500px] rounded-full bg-gradient-to-br from-[#628ECB]/20 to-transparent blur-3xl" />
+        <div className="absolute right-0 top-0 h-[600px] w-[600px] rounded-full bg-gradient-to-bl from-[#10B981]/10 to-transparent blur-3xl" />
 
         <div className={`${desktopContainer} relative`}>
-          <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
-            <div className="space-y-8">
-              {/* Label brand */}
-              <div className="space-y-3">
-                <p className="text-[11px] font-extrabold uppercase tracking-[0.35em] text-[#628ECB]">
-                  Selamat Datang di CONNETIC Module
-                </p>
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#10B981]/25 bg-[#10B981]/10 px-4 py-1.5 text-sm font-bold text-[#0F8A66]">
-                  <GraduationCap className="h-3.5 w-3.5" />
+          <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-20">
+            <div className="space-y-6 animate-in fade-in slide-in-from-left-8 duration-1000">
+              {/* Brand Label — Modernized */}
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2.5 rounded-[1.25rem] bg-gradient-to-r from-[#10B981]/10 to-[#10B981]/5 border border-[#10B981]/20 px-5 py-2 text-sm font-bold text-[#0F8A66] shadow-sm">
+                  <GraduationCap className="h-4 w-4" />
                   Media Pembelajaran Interaktif Berbasis CTL
                 </div>
               </div>
 
-              {/* Tagline + deskripsi */}
-              <div className="space-y-5">
-                <div className="flex items-center gap-3">
-                  <span className="h-1 w-8 shrink-0 rounded-full bg-[#628ECB]" />
-                  <p className="whitespace-nowrap text-lg font-bold text-[#395886] sm:text-xl lg:text-2xl">
-                    Belajar jadi lebih terarah dan logis.
+              {/* Headline & Subheadline */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black leading-[1.1] tracking-tighter text-[#395886]">
+                    Selamat Datang <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#395886] to-[#628ECB]">di CONNETIC Module</span>
+                  </h1>
+                  <p className="text-base sm:text-lg font-bold text-[#628ECB] tracking-tight">
+                    Belajar Lebih Terarah & Logis.
                   </p>
                 </div>
 
-                <h1 className="max-w-2xl text-4xl font-extrabold leading-tight tracking-tight text-[#395886] sm:text-5xl lg:text-6xl">
-                  Platform CTL untuk Siswa{' '}
-                  <span className="relative whitespace-nowrap">
-                    <span className="relative z-10">DDTJKT</span>
-                    <span className="absolute -bottom-1 left-0 h-3 w-full rounded-full bg-[#628ECB]/20" />
-                  </span>{' '}
-                  SMK.
-                </h1>
+                <div className="h-1.5 w-24 rounded-full bg-gradient-to-r from-[#628ECB] to-transparent" />
 
-                <p className="max-w-lg text-base leading-relaxed text-[#395886]/70">
-                  Dirancang khusus untuk kelas X TJKT, membahas materi{' '}
-                  <strong className="text-[#395886]">TCP, IP Address, IPv4,</strong> dan{' '}
-                  <strong className="text-[#395886]">IPv6</strong> melalui 7 tahapan CTL yang terstruktur dan
-                  bermakna — meningkatkan kemampuan <strong className="text-[#395886]">logical thinking</strong> siswa.
+                <p className="max-w-xl text-lg leading-relaxed text-[#395886]/70 font-medium">
+                  Optimalkan pemahaman konsep <span className="text-[#395886] font-bold">TCP </span> dan <span className="text-[#395886] font-bold">IP Address</span> melalui model 7 tahapan CTL yang dirancang khusus untuk meningkatkan <span className="relative inline-block">
+                    <span className="relative z-10 font-bold text-[#395886]">Logical Thinking</span>
+                    <span className="absolute bottom-1 left-0 h-2.5 w-full bg-[#10B981]/15 -rotate-1" />
+                  </span> siswa SMK.
                 </p>
               </div>
 
-              {/* Tombol Aksi */}
-              <div className="flex flex-wrap items-center gap-3">
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-4">
                 <Link
                   to="/login"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-[#628ECB] px-7 py-3.5 text-sm font-bold text-white shadow-xl shadow-[#628ECB]/25 transition-all hover:bg-[#395886] hover:-translate-y-0.5 active:scale-95"
+                  className="group relative inline-flex items-center gap-3 overflow-hidden rounded-[2rem] bg-[#395886] px-10 py-5 text-base font-black text-white shadow-2xl shadow-[#395886]/30 transition-all hover:bg-[#628ECB] hover:-translate-y-1 active:scale-95"
                 >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   Mulai Belajar Sekarang
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
                 </Link>
               </div>
             </div>
 
-            <div className="relative hidden lg:flex lg:flex-col lg:gap-4">
-              <div className="absolute -left-8 -top-8 h-64 w-64 rounded-full bg-[#628ECB]/10 blur-3xl" />
-              <div className="absolute -bottom-8 -right-8 h-48 w-48 rounded-full bg-[#10B981]/10 blur-2xl" />
-              <div className="relative overflow-hidden rounded-[40px] border border-white/50 bg-gradient-to-br from-[#628ECB] to-[#395886] p-8 shadow-2xl">
-                <div className="grid gap-4">
-                  <div className="rounded-2xl bg-white/10 p-5 backdrop-blur-md">
-                    <div className="mb-3 flex items-center gap-2">
-                      <Network className="h-7 w-7 text-white" />
-                      <h3 className="text-base font-bold text-white">Kurikulum Terpadu</h3>
+            <div className="relative hidden lg:block animate-in fade-in zoom-in-95 duration-1000 delay-200">
+              {/* Main Card — Premium Glassmorphism */}
+              <div className="absolute -left-12 -top-12 h-64 w-64 rounded-full bg-[#628ECB]/10 blur-3xl animate-pulse" />
+              <div className="absolute -bottom-12 -right-12 h-48 w-48 rounded-full bg-[#10B981]/10 blur-2xl animate-pulse" />
+              
+              <div className="relative overflow-hidden rounded-[3.5rem] border border-white/40 bg-white/40 backdrop-blur-xl p-3 shadow-[0_32px_64px_-16px_rgba(57,88,134,0.2)]">
+                <div className="relative overflow-hidden rounded-[3rem] border border-white/60 bg-gradient-to-br from-[#395886] to-[#628ECB] p-10 text-white shadow-inner">
+                  <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 h-64 w-64 rounded-full bg-white/5 blur-2xl" />
+                  
+                  <div className="relative space-y-8">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-white/15 backdrop-blur-md shadow-lg border border-white/20">
+                        <Network className="h-8 w-8 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black tracking-tight">Kurikulum TJKT</h3>
+                        <p className="text-white/60 text-xs font-bold uppercase tracking-widest">Pertemuan Terstruktur</p>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+
+                    <div className="grid grid-cols-2 gap-3">
                       {[
                         { num: 1, topic: 'TCP' },
-                        { num: 2, topic: 'IP Address' },
+                        { num: 2, topic: 'Mekanisme TCP' },
                         { num: 3, topic: 'IPv4' },
                         { num: 4, topic: 'IPv6' },
                       ].map((item) => (
-                        <div key={item.num} className="rounded-xl bg-white/15 px-3 py-2.5 text-center">
-                          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/55">Pertemuan {item.num}</p>
-                          <p className="mt-0.5 text-sm font-bold text-white">{item.topic}</p>
+                        <div key={item.num} className="group relative overflow-hidden rounded-2xl bg-white/10 hover:bg-white/20 p-4 transition-all border border-white/10 hover:border-white/30">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-white/50 group-hover:text-white/70 transition-colors">Modul {item.num}</p>
+                          <p className="mt-1 text-sm font-extrabold text-white">{item.topic}</p>
                         </div>
                       ))}
                     </div>
-                  </div>
-                  <div className="rounded-2xl bg-white/10 p-5 backdrop-blur-md">
-                    <div className="mb-2 flex items-center gap-2">
-                      <ShieldCheck className="h-7 w-7 text-white" />
-                      <h3 className="text-base font-bold text-white">Evaluasi Terukur</h3>
+
+                    <div className="rounded-2xl bg-white/10 p-6 backdrop-blur-md border border-white/10">
+                      <div className="mb-3 flex items-center gap-3">
+                        <div className="h-1.5 w-1.5 rounded-full bg-[#10B981]" />
+                        <h3 className="text-sm font-black uppercase tracking-widest text-white/80">Evaluasi Terintegrasi</h3>
+                      </div>
+                      <p className="text-sm leading-relaxed text-white/70 font-medium">
+                        Dilengkapi sistem Pre-test & Post-test untuk mengukur tingkat pemahaman siswa secara realtime dan akurat.
+                      </p>
                     </div>
-                    <p className="text-sm leading-relaxed text-white/70">
-                      Dilengkapi dengan pretest dan posttest untuk mengukur tingkat pemahaman siswa secara akurat.
-                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Statistik — kolom kanan, di bawah kartu gradien */}
-              <div className="relative grid grid-cols-3 gap-3">
-                <div className="flex flex-col items-center rounded-2xl border border-[#D5DEEF]/70 bg-white/70 p-4 shadow-sm backdrop-blur-sm">
-                  <p className="text-2xl font-extrabold text-[#628ECB]">4</p>
-                  <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-[#395886]/50">Pertemuan</p>
-                </div>
-                <div className="flex flex-col items-center rounded-2xl border border-[#D5DEEF]/70 bg-white/70 p-4 shadow-sm backdrop-blur-sm">
-                  <p className="text-2xl font-extrabold text-[#10B981]">7</p>
-                  <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-[#395886]/50">Tahapan CTL</p>
-                </div>
-                <div className="flex flex-col items-center rounded-2xl border border-[#D5DEEF]/70 bg-white/70 p-4 shadow-sm backdrop-blur-sm">
-                  <p className="text-2xl font-extrabold text-[#F59E0B]">2</p>
-                  <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-[#395886]/50">Evaluasi Umum</p>
-                </div>
+              {/* Stats Overlay — Floating */}
+              <div className="absolute -right-8 bottom-12 grid gap-3">
+                {[
+                  { val: '4', label: 'Modul', color: 'text-[#628ECB]' },
+                  { val: '7', label: 'CTL Stages', color: 'text-[#10B981]' },
+                ].map((stat, i) => (
+                  <div key={i} className="flex flex-col items-center rounded-2xl border border-white/60 bg-white/80 p-4 shadow-xl backdrop-blur-md transition-transform hover:-translate-x-1">
+                    <p className={`text-2xl font-black ${stat.color}`}>{stat.val}</p>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-[#395886]/50">{stat.label}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -281,7 +287,7 @@ export function LandingPage() {
                   <strong>CONNETIC Module</strong> adalah media pembelajaran interaktif berbasis web yang dirancang untuk mendukung pembelajaran mata pelajaran <strong>Dasar-Dasar Teknik Jaringan Komputer dan Telekomunikasi (DDTJKT)</strong> pada siswa kelas X TJKT SMK.
                 </p>
                 <p>
-                  Media ini menggunakan pendekatan <strong>Contextual Teaching and Learning (CTL)</strong> yang menghubungkan materi pembelajaran dengan situasi nyata, sehingga siswa dapat memahami konsep secara lebih mendalam. Materi yang dibahas meliputi <strong>TCP, IP Address, IPv4,</strong> dan <strong>IPv6</strong>.
+                  Media ini menggunakan pendekatan <strong>Contextual Teaching and Learning (CTL)</strong> yang menghubungkan materi pembelajaran dengan situasi nyata, sehingga siswa dapat memahami konsep secara lebih mendalam. Materi yang dibahas meliputi <strong>TCP, Mekanisme TCP, IPv4,</strong> dan <strong>IPv6</strong>.
                 </p>
                 <p>
                   Tujuan utama pengembangan media ini adalah meningkatkan kemampuan <strong>logical thinking</strong> (berpikir logis) siswa melalui aktivitas pembelajaran yang terstruktur, interaktif, dan bermakna dengan 7 tahapan CTL.
@@ -496,16 +502,10 @@ export function LandingPage() {
             {/* Identitas Merek */}
             <div className="space-y-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
-                  <BookOpen className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-xl font-bold leading-tight">CONNETIC Module</p>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/50">Interactive Learning</p>
-                </div>
+                <Logo theme="dark" />
               </div>
               <p className="text-sm leading-relaxed text-white/60">
-                Media pembelajaran interaktif berbasis web untuk menunjang proses belajar mengajar pada mata pelajaran Dasar-Dasar Teknik Jaringan Komputer dan Telekomunikasi SMK kelas X. Dikembangkan dengan pendekatan Contextual Teaching and Learning (CTL) untuk meningkatkan pemahaman dan logical thinking siswa.
+                Media pembelajaran interaktif berbasis web untuk menunjang proses belajar mengajar pada mata pelajaran DDTJKT SMK kelas X. Dikembangkan dengan model CTL untuk meningkatkan kemampuan logical thinking siswa.
               </p>
             </div>
 
@@ -529,7 +529,7 @@ export function LandingPage() {
               <div className="mt-4 space-y-2">
                 <h4 className="text-sm font-bold uppercase tracking-widest text-white/50">Materi</h4>
                 <div className="flex flex-wrap gap-2">
-                  {['TCP', 'IP Address', 'IPv4', 'IPv6'].map((m) => (
+                  {['TCP', 'Mekanisme TCP', 'IPv4', 'IPv6'].map((m) => (
                     <span key={m} className="rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-white/70">
                       {m}
                     </span>

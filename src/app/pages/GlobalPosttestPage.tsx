@@ -4,28 +4,36 @@ import {
   saveGlobalPosttestResult,
   getGlobalTestProgress,
   isGlobalPosttestUnlocked,
+  GlobalTestProgress,
 } from '../utils/progress';
-import { globalPosttest } from '../data/lessons';
+import { globalPosttest, type TestQuestion } from '../data/lessons';
+import { loadTestQuestions } from '../utils/adminData';
 import { TestPage } from '../components/TestPage';
 import { useEffect, useState } from 'react';
-import { BookOpen, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
+import { Logo } from '../components/layout/Logo';
 
 export function GlobalPosttestPage() {
   const navigate = useNavigate();
-  const user = getCurrentUser();
-  const [progress, setProgress] = useState(() => getGlobalTestProgress(user!.id));
-  const [isUnlocked] = useState(() => isGlobalPosttestUnlocked(user!.id));
+  const [user] = useState(getCurrentUser);
+  const [progress, setProgress] = useState<GlobalTestProgress>({
+    userId: user?.id ?? '',
+    globalPretestCompleted: false,
+    globalPosttestCompleted: false,
+  });
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [questions, setQuestions] = useState<TestQuestion[]>(globalPosttest.questions);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
+    if (!user) { navigate('/login'); return; }
+    getGlobalTestProgress(user.id).then(setProgress);
+    isGlobalPosttestUnlocked(user.id).then(setIsUnlocked);
+    loadTestQuestions('global-posttest').then(setQuestions);
   }, [user, navigate]);
 
-  const handleComplete = (score: number, answers: number[]) => {
-    saveGlobalPosttestResult(user!.id, score, answers);
-    setProgress(getGlobalTestProgress(user!.id));
+  const handleComplete = async (score: number, answers: number[]) => {
+    await saveGlobalPosttestResult(user!.id, score, answers);
+    getGlobalTestProgress(user!.id).then(setProgress);
   };
 
   if (!isUnlocked) {
@@ -36,16 +44,17 @@ export function GlobalPosttestPage() {
             <div className="flex min-h-[76px] items-center justify-between gap-6">
               <div className="flex min-w-0 items-center gap-4">
                 <Link to="/dashboard" className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#628ECB] shadow-sm">
-                    <BookOpen className="h-6 w-6 text-white" />
-                  </div>
                   <div className="hidden min-w-0 sm:block">
-                    <p className="truncate text-lg font-bold text-[#395886]">CONNETIC Module</p>
-                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#628ECB]">Interactive Learning</p>
+                    <Logo />
+                  </div>
+                  <div className="sm:hidden">
+                    <Logo size="sm" />
                   </div>
                 </Link>
                 <div className="h-8 w-px bg-[#D5DEEF] hidden sm:block" />
-                <span className="hidden sm:block text-sm font-bold text-[#628ECB] uppercase tracking-widest">Post-Test Umum</span>
+                <span className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-[#628ECB]/10 px-3 py-1 text-xs font-bold text-[#628ECB] uppercase tracking-widest border border-[#628ECB]/20">
+                  Post-Test Umum
+                </span>
               </div>
             </div>
           </div>
@@ -73,14 +82,14 @@ export function GlobalPosttestPage() {
   }
 
   const existingAnswers = progress.globalPosttestCompleted
-    ? JSON.parse(localStorage.getItem(`global_posttest_answers_${user!.id}`) || '[]')
+    ? (progress.globalPosttestAnswers ?? [])
     : undefined;
 
   return (
     <TestPage
       title={globalPosttest.title}
       description={globalPosttest.description}
-      questions={globalPosttest.questions}
+      questions={questions}
       onComplete={handleComplete}
       backPath="/dashboard"
       showResults={progress.globalPosttestCompleted}

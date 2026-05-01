@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ArrowRight, BookOpen, LogIn, ShieldCheck, Eye, EyeOff, Home, CheckCircle } from 'lucide-react';
 import { login } from '../utils/auth';
+import { Logo } from '../components/layout/Logo';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -14,20 +15,30 @@ export function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    const user = login(identifier, password);
-    if (!user) {
-      setError('Username/email atau password salah. Periksa kembali username/email dan password Anda.');
-      return;
+    try {
+      const user = await login(identifier, password);
+      if (!user) {
+        setError('Username/email atau password salah. Periksa kembali data Anda.');
+        setIsLoading(false);
+        return;
+      }
+
+      setSuccess(true);
+      // Langsung ke /admin jika admin, atau /dashboard jika siswa
+      const destination = user.role === 'admin' ? '/admin' : '/dashboard';
+      setTimeout(() => navigate(destination), 1500);
+    } catch (err: any) {
+      console.error('Login submit error:', err);
+      setError('Terjadi kesalahan saat memproses login. Silakan coba lagi.');
+      setIsLoading(false);
     }
-
-    setSuccess(true);
-    const destination = user.role === 'admin' ? '/admin' : '/dashboard';
-    setTimeout(() => navigate(destination), 1500);
   };
 
   return (
@@ -35,16 +46,10 @@ export function LoginPage() {
       <header className="sticky top-4 z-50 mx-auto flex w-full max-w-[1280px] items-center justify-between rounded-2xl border border-white/70 bg-white/85 px-4 py-3 shadow-[0_18px_55px_rgba(57,88,134,0.08)] backdrop-blur sm:px-6">
         <div className="flex items-center">
           <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#628ECB] shadow-md">
-              <BookOpen className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-[#395886]">CONNETIC Module</p>
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#628ECB]">Interactive Learning</p>
-            </div>
+            <Logo />
           </Link>
           <div className="mx-4 hidden h-8 w-px bg-[#D5DEEF] sm:block" />
-          <span className="hidden text-sm font-bold uppercase tracking-widest text-[#628ECB] sm:block">Login</span>
+          <span className="hidden sm:inline-flex items-center rounded-lg bg-[#628ECB]/10 px-3 py-1 text-xs font-bold text-[#628ECB] uppercase tracking-widest border border-[#628ECB]/20">Login</span>
         </div>
         <Link
           to="/"
@@ -56,36 +61,31 @@ export function LoginPage() {
       </header>
 
       <main className="mx-auto flex min-h-[calc(100vh-7.5rem)] max-w-[1280px] items-center py-6">
-        <div className="grid w-full overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-[0_30px_80px_rgba(57,88,134,0.14)] backdrop-blur lg:grid-cols-[1.02fr_0.98fr]">
+        <div className="grid w-full overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-[0_30px_80px_rgba(57,88,134,0.14)] backdrop-blur lg:grid-cols-[0.8fr_1.2fr]">
           <section className="relative overflow-hidden bg-[#395886] px-6 py-8 text-white sm:px-8 lg:px-10">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.18),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(213,222,239,0.24),_transparent_32%)]" />
-            <div className="relative flex h-full flex-col justify-between gap-6">
-              <div className="space-y-5">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold">
-                  <LogIn className="h-5 w-5" />
-                  Masuk ke Akun
+            <div className="relative flex h-full flex-col justify-center py-10 lg:py-12 gap-7">
+              <div className="space-y-6">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold w-fit">
+                  <LogIn className="h-4 w-4" />
+                  Panduan Masuk
                 </div>
 
-                <div className="space-y-3">
-                  <h1 className="max-w-md text-3xl font-bold leading-tight sm:text-4xl">
-                    Masuk untuk melanjutkan aktivitas belajar Anda.
+                <div className="space-y-4">
+                  <h1 className="max-w-md text-3xl font-bold leading-tight sm:text-4xl tracking-tight">
+                    Masuk ke Sistem Pembelajaran
                   </h1>
-                  <p className="max-w-lg text-sm leading-7 text-white/80 sm:text-base">
-                    Gunakan username atau email yang telah terdaftar. Admin dapat masuk menggunakan kredensial khusus.
+                  <p className="max-w-lg text-sm leading-relaxed text-white/80 sm:text-base">
+                    Silakan masukkan username atau email beserta password yang telah Anda daftarkan sebelumnya untuk melanjutkan progres belajar Anda.
                   </p>
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-                  <ShieldCheck className="mb-3 h-8 w-8 text-[#D5DEEF]" />
-                  <p className="mb-1 text-sm font-semibold">Akses Terintegrasi</p>
-                  <p className="text-sm text-white/75">Siswa dan admin masuk melalui satu pintu yang sama.</p>
-                </div>
-                <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-                  <BookOpen className="mb-3 h-8 w-8 text-[#D5DEEF]" />
-                  <p className="mb-1 text-sm font-semibold">Keamanan Data</p>
-                  <p className="text-sm text-white/75">Progres belajar Anda tersimpan aman dan dapat diakses kapan saja.</p>
+              <div className="space-y-4">
+                <div className="rounded-[1.5rem] border border-white/15 bg-white/10 p-5 backdrop-blur-sm shadow-sm transition-all hover:bg-white/15">
+                  <ShieldCheck className="mb-3 h-7 w-7 text-[#D5DEEF]" />
+                  <p className="mb-1 text-sm font-semibold">Gunakan Akun Terdaftar</p>
+                  <p className="text-xs text-white/75 leading-relaxed">Pastikan data yang Anda masukkan sesuai dengan saat pendaftaran untuk menghindari kendala akses.</p>
                 </div>
               </div>
             </div>
@@ -120,7 +120,7 @@ export function LoginPage() {
               )}
 
               {error && (
-                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-medium">
                   {error}
                 </div>
               )}
@@ -128,7 +128,7 @@ export function LoginPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <label htmlFor="identifier" className="block text-sm font-semibold text-[#395886]">
-                    Username atau Email
+                    Username, Email, atau NIS
                   </label>
                   <input
                     id="identifier"
@@ -136,7 +136,7 @@ export function LoginPage() {
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     className="w-full rounded-2xl border border-[#D5DEEF] bg-white px-4 py-3.5 text-[#395886] outline-none transition focus:border-[#628ECB] focus:ring-4 focus:ring-[#628ECB]/15"
-                    placeholder="username atau nama@email.com"
+                    placeholder="username, email, atau NIS"
                     required
                   />
                 </div>
@@ -175,22 +175,22 @@ export function LoginPage() {
                     />
                     <span className="text-sm text-[#395886]/70">Ingat saya</span>
                   </label>
-                  <Link to="/register" className="text-sm font-semibold text-[#628ECB] hover:underline">
-                    Lupa password?
-                  </Link>
+                  <span className="text-xs font-bold text-[#628ECB]">
+                    Lupa Password? Hubungi Guru.
+                  </span>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={success}
+                  disabled={success || isLoading}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#628ECB] px-5 py-3.5 font-semibold text-white shadow-lg shadow-[#628ECB]/20 transition hover:bg-[#395886] disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {success ? 'Mengalihkan...' : 'Masuk'}
+                  {success ? 'Mengalihkan...' : isLoading ? 'Memproses...' : 'Masuk'}
                   <ArrowRight className="h-5 w-5" />
                 </button>
               </form>
 
-              <p className="mt-6 text-sm text-[#395886]/75">
+              <p className="mt-6 text-center text-sm text-[#395886]/75">
                 Belum punya akun siswa?{' '}
                 <Link to="/register" className="font-semibold text-[#628ECB] hover:text-[#395886]">
                   Daftar di sini

@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
-import { ChevronRight, ChevronLeft, BookOpen, Lightbulb, CheckCircle, User } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Lightbulb, CheckCircle, User } from 'lucide-react';
 import { getCurrentUser } from '../utils/auth';
 import { getLessonProgress, saveReflectionResult } from '../utils/progress';
 import { lessons } from '../data/lessons';
+import { Logo } from '../components/layout/Logo';
 
 export function ReflectionPage() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const [user] = useState(getCurrentUser);
   const lesson = lessonId ? lessons[lessonId] : null;
 
   const [essays, setEssays] = useState({
@@ -27,44 +28,41 @@ export function ReflectionPage() {
       navigate('/dashboard');
       return;
     }
-    const progress = getLessonProgress(user.id, lessonId!);
-    if (!progress.posttestCompleted) {
-      navigate(`/lesson/${lessonId}`);
-    }
+    getLessonProgress(user.id, lessonId!).then((progress) => {
+      if (!progress.posttestCompleted) navigate(`/lesson/${lessonId}`);
+    });
   }, [user, lesson, navigate, lessonId]);
 
   if (!lesson) return null;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (essays.easy.length < 15 || essays.hard.length < 15) {
       setError('Tuliskan refleksi yang lebih mendalam (minimal 15 karakter per isian).');
       return;
     }
     
-    saveReflectionResult(user!.id, lessonId!, essays);
+    await saveReflectionResult(user!.id, lessonId!, essays);
     setSubmitted(true);
     setError('');
   };
 
   return (
     <div className="min-h-screen bg-[#F0F3FA]">
-      <header className="sticky top-0 z-50 w-full border-b border-[#D5DEEF] bg-white/90 shadow-sm backdrop-blur-md transition-all">
+      <header className="sticky top-0 z-50 w-full border-b border-[#C8D8F0] bg-white/95 shadow-md backdrop-blur-md transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex min-h-[76px] items-center justify-between gap-6">
             <div className="flex min-w-0 items-center gap-4">
               <Link to="/dashboard" className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#628ECB] shadow-sm">
-                  <BookOpen className="h-5 w-5 text-white" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-base font-bold text-[#395886]">CONNETIC Module</p>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#628ECB]">Self Reflection</p>
-                </div>
+                <Logo size="sm" />
               </Link>
+              <div className="h-8 w-px bg-[#D5DEEF] hidden sm:block" />
+              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-[#628ECB]/10 px-3 py-1 text-xs font-bold text-[#628ECB] uppercase tracking-widest border border-[#628ECB]/20">
+                Refleksi Belajar
+              </span>
             </div>
             <Link
               to="/dashboard"
-              className="flex items-center gap-2 text-[#395886] hover:text-[#628ECB] transition-colors text-sm font-semibold"
+              className="flex items-center gap-2 text-[#395886] hover:text-[#628ECB] transition-colors text-sm font-bold"
             >
               <ChevronLeft className="w-4 h-4" />
               <span>Dashboard</span>

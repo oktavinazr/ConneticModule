@@ -1,5 +1,6 @@
+import React from 'react';
 import { Link } from 'react-router';
-import { Menu, BookOpen } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import {
   Sheet,
   SheetClose,
@@ -8,6 +9,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from './ui/sheet';
+import { Logo } from './layout/Logo';
 
 interface MobileSidebarItem {
   label: string;
@@ -94,17 +96,11 @@ export function MobileSidebar({ title, description, items }: MobileSidebarProps)
         <SheetHeader className="p-0">
           <div className="bg-gradient-to-br from-[#395886] to-[#628ECB] px-6 py-6">
             <div className="mb-3 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 shadow-sm">
-                <BookOpen className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <SheetTitle className="text-base font-bold leading-tight text-white">
-                  CONNETIC
-                </SheetTitle>
-                <p className="text-xs font-semibold uppercase tracking-widest text-white/70">
-                  Module
-                </p>
-              </div>
+              <SheetTitle asChild>
+                <div>
+                  <Logo theme="dark" size="sm" />
+                </div>
+              </SheetTitle>
             </div>
             <p className="text-xs font-medium text-white/80">{description}</p>
           </div>

@@ -1,35 +1,41 @@
 import { useNavigate } from 'react-router';
 import { getCurrentUser } from '../utils/auth';
-import { saveGlobalPretestResult, getGlobalTestProgress } from '../utils/progress';
-import { globalPretest } from '../data/lessons';
+import { saveGlobalPretestResult, getGlobalTestProgress, GlobalTestProgress } from '../utils/progress';
+import { globalPretest, type TestQuestion } from '../data/lessons';
+import { loadTestQuestions } from '../utils/adminData';
 import { TestPage } from '../components/TestPage';
 import { useEffect, useState } from 'react';
 
 export function GlobalPretestPage() {
   const navigate = useNavigate();
-  const user = getCurrentUser();
-  const [progress, setProgress] = useState(() => getGlobalTestProgress(user!.id));
+  const [user] = useState(getCurrentUser);
+  const [progress, setProgress] = useState<GlobalTestProgress>({
+    userId: user?.id ?? '',
+    globalPretestCompleted: false,
+    globalPosttestCompleted: false,
+  });
+  const [questions, setQuestions] = useState<TestQuestion[]>(globalPretest.questions);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-    }
+    if (!user) { navigate('/login'); return; }
+    getGlobalTestProgress(user.id).then(setProgress);
+    loadTestQuestions('global-pretest').then(setQuestions);
   }, [user, navigate]);
 
-  const handleComplete = (score: number, answers: number[]) => {
-    saveGlobalPretestResult(user!.id, score, answers);
-    setProgress(getGlobalTestProgress(user!.id));
+  const handleComplete = async (score: number, answers: number[]) => {
+    await saveGlobalPretestResult(user!.id, score, answers);
+    getGlobalTestProgress(user!.id).then(setProgress);
   };
 
   const existingAnswers = progress.globalPretestCompleted
-    ? JSON.parse(localStorage.getItem(`global_pretest_answers_${user!.id}`) || '[]')
+    ? (progress.globalPretestAnswers ?? [])
     : undefined;
 
   return (
     <TestPage
       title={globalPretest.title}
       description={globalPretest.description}
-      questions={globalPretest.questions}
+      questions={questions}
       onComplete={handleComplete}
       backPath="/dashboard"
       showResults={progress.globalPretestCompleted}

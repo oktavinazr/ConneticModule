@@ -1,23 +1,28 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
 import {
+  ArrowRight,
   BookOpen,
-  ChevronLeft,
   CheckCircle,
-  Info,
-  Video,
-  Search,
-  HelpCircle,
-  Users,
-  MonitorPlay,
-  Lightbulb,
+  ChevronLeft,
+  ChevronDown, // <-- Tambahan icon untuk accordion
+  Eye,
   FileText,
-  Lock,
-  AlertCircle,
+  HelpCircle,
+  Info,
+  Lightbulb,
+  MonitorPlay,
+  Search,
+  Trophy,
+  Users,
+  Video,
 } from 'lucide-react';
-import { getCurrentUser } from '../utils/auth';
-import { getLessonProgress, saveStageProgress, saveStageAttempt } from '../utils/progress';
-import { getStageDisplayTitle, lessons, stageLearningObjectivesByLesson } from '../data/lessons';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 import { ConstructivismStage } from '../components/stages/ConstructivismStage';
 import { InquiryStage } from '../components/stages/InquiryStage';
 import { QuestioningStage } from '../components/stages/QuestioningStage';
@@ -26,6 +31,13 @@ import { ModelingStage } from '../components/stages/ModelingStage';
 import { ReflectionStage } from '../components/stages/ReflectionStage';
 import { AuthenticAssessmentStage } from '../components/stages/AuthenticAssessmentStage';
 import { LessonFlowSidebar } from '../components/LessonFlowSidebar';
+import { Logo } from '../components/layout/Logo';
+import { getStageDisplayTitle, lessons, stageLearningObjectivesByLesson } from '../data/lessons';
+import { getCurrentUser } from '../utils/auth';
+import { getCachedProgress, getLessonProgress, saveStageProgress } from '../utils/progress';
+import { StageAnswerDetail } from '../components/admin/StageDetail';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 type StageType =
   | 'constructivism'
@@ -47,108 +59,228 @@ interface StageGuide {
 
 const stageGuides: Record<StageType, StageGuide> = {
   constructivism: {
-    icon: <Video className="w-5 h-5" />,
+    icon: <Video className="w-6 h-6" />,
     label: 'Constructivism',
     accentColor: 'text-[#628ECB]',
     borderColor: 'border-[#628ECB]/30',
     bgColor: 'bg-[#628ECB]/5',
     steps: [
-      'Baca skenario apersepsi dengan seksama — bayangkan situasinya dari pengalamanmu sendiri.',
-      'Pilih jawaban yang paling sesuai dengan pemahamanmu saat ini.',
-      'Tuliskan alasan singkat pilihanmu, lalu periksa apakah jawabanmu tepat.',
+      'Bangun dulu pemahaman awal dari pengalaman sehari-hari.',
+      'Susun atau kelompokkan informasi sampai urutannya terasa logis.',
+      'Tarik kesimpulan awal sebelum masuk ke materi formal.',
     ],
   },
   inquiry: {
-    icon: <Search className="w-5 h-5" />,
+    icon: <Search className="w-6 h-6" />,
     label: 'Inquiry',
     accentColor: 'text-[#10B981]',
     borderColor: 'border-[#10B981]/30',
     bgColor: 'bg-[#10B981]/5',
     steps: [
-      'Klik setiap bagian materi untuk membukanya — baca dengan cermat sebelum lanjut.',
-      'Setelah semua bagian dibaca, lanjut ke aktivitas pengelompokan.',
-      'Seret item ke kelompok/kategori yang tepat, lalu periksa jawabanmu.',
+      'Eksplorasi materi lebih dulu sebelum menjawab.',
+      'Susun struktur atau label berdasarkan hasil pengamatanmu sendiri.',
+      'Periksa kembali urutan dan fungsi sampai konsisten.',
     ],
   },
   questioning: {
-    icon: <HelpCircle className="w-5 h-5" />,
+    icon: <HelpCircle className="w-6 h-6" />,
     label: 'Questioning',
     accentColor: 'text-[#8B5CF6]',
     borderColor: 'border-[#8B5CF6]/30',
     bgColor: 'bg-[#8B5CF6]/5',
     steps: [
-      'Baca skenario dengan teliti — pahami konteks situasi yang diceritakan.',
-      'Jawab pertanyaan "mengapa" dengan memilih alasan yang paling logis.',
-      'Gunakan tombol bantuan (hint) jika butuh petunjuk sebelum menjawab.',
+      'Amati masalah dan aktifkan rasa ingin tahumu.',
+      'Pilih solusi teknis yang paling relevan.',
+      'Jelaskan alasan logismu sebelum melanjutkan.',
     ],
   },
   'learning-community': {
-    icon: <Users className="w-5 h-5" />,
+    icon: <Users className="w-6 h-6" />,
     label: 'Learning Community',
     accentColor: 'text-[#F59E0B]',
     borderColor: 'border-[#F59E0B]/30',
     bgColor: 'bg-[#F59E0B]/5',
     steps: [
-      'Selesaikan aktivitas matching: klik item kiri, lalu klik pasangannya di kanan.',
-      'Analisis studi kasus dan pilih solusi yang paling tepat beserta alasannya.',
-      'Lihat dan bandingkan jawabanmu dengan perspektif kelompok lain.',
+      'Bandingkan beberapa alternatif atau jawaban teman.',
+      'Berikan komentar, penguatan, atau koreksi yang jelas.',
+      'Validasi logika bersama untuk memperkuat pemahaman.',
     ],
   },
   modeling: {
-    icon: <MonitorPlay className="w-5 h-5" />,
+    icon: <MonitorPlay className="w-6 h-6" />,
     label: 'Modeling',
     accentColor: 'text-[#EC4899]',
     borderColor: 'border-[#EC4899]/30',
     bgColor: 'bg-[#EC4899]/5',
     steps: [
-      'Pelajari setiap langkah satu per satu menggunakan tombol navigasi (Sebelumnya / Selanjutnya).',
-      'Setelah semua langkah dipelajari, lanjut ke latihan pengurutan.',
-      'Seret langkah-langkah ke urutan yang benar, lalu periksa jawabanmu.',
+      'Ikuti simulasi langkah demi langkah dengan runtut.',
+      'Selesaikan setiap aksi praktik sebelum berpindah.',
+      'Gunakan model ini sebagai contoh sistematis.',
     ],
   },
   reflection: {
-    icon: <Lightbulb className="w-5 h-5" />,
+    icon: <Lightbulb className="w-6 h-6" />,
     label: 'Reflection',
     accentColor: 'text-[#F59E0B]',
     borderColor: 'border-[#F59E0B]/30',
     bgColor: 'bg-[#F59E0B]/5',
     steps: [
-      'Renungkan perkembangan pemahamanmu — bandingkan dengan pengetahuan awal di Constructivism.',
-      'Tuliskan refleksi singkat dengan kata-katamu sendiri (min. 30 karakter).',
-      'Nilai pemahamanmu untuk setiap kriteria kompetensi secara jujur.',
+      'Hubungkan konsep-konsep utama menjadi satu gambaran utuh.',
+      'Tuliskan kembali pemahamanmu dengan kalimat sendiri.',
+      'Nilai perkembanganmu secara jujur.',
     ],
   },
   'authentic-assessment': {
-    icon: <FileText className="w-5 h-5" />,
+    icon: <FileText className="w-6 h-6" />,
     label: 'Authentic Assessment',
     accentColor: 'text-[#8B5CF6]',
     borderColor: 'border-[#8B5CF6]/30',
     bgColor: 'bg-[#8B5CF6]/5',
     steps: [
-      'Baca konteks skenario secara menyeluruh sebelum membuat keputusan.',
-      'Pilih keputusan dan ikuti konsekuensinya — jawab pertanyaan lanjutan yang muncul.',
-      'Baca evaluasi akhir, atau coba jalur lain untuk memahami semua perspektif.',
+      'Gunakan bukti kasus untuk memilih langkah diagnosis.',
+      'Ikuti cabang keputusan sambil menjelaskan alasanmu.',
+      'Simpulkan prioritas solusi berdasarkan hasil analisis.',
     ],
   },
 };
 
+const stageCtlDescriptions: Record<StageType, string> = {
+  constructivism: 'Membangun pemahaman sendiri dari pengalaman baru berdasarkan pengetahuan awal.',
+  inquiry: 'Proses perpindahan dari pengamatan (eksplorasi materi) menjadi pemahaman melalui siklus observasi dan bertanya.',
+  questioning: 'Guru mendorong rasa ingin tahu siswa melalui pertanyaan.',
+  'learning-community': 'Belajar kelompok untuk berbagi ide dan pengalaman.',
+  modeling: 'Guru atau siswa memberikan contoh konsep yang dipelajari.',
+  reflection: 'Mengulas kembali apa yang telah dipelajari di akhir pertemuan.',
+  'authentic-assessment': 'Menilai proses dan hasil belajar (pengetahuan, sikap, keterampilan) secara menyeluruh.',
+};
+
+const stageReflectionPrompts: Record<StageType, string> = {
+  constructivism: '',
+  inquiry: 'Berdasarkan eksplorasi dan penyusunan yang kamu lakukan, apa kesimpulan utama yang kamu temukan tentang konsep ini? Jelaskan dengan kata-katamu sendiri secara runtut.',
+  questioning: 'Berdasarkan skenario yang baru saja kamu analisis, mengapa gangguan pada satu lapisan dapat memengaruhi seluruh proses komunikasi? Jelaskan alasanmu secara logis.',
+  'learning-community': 'Berdasarkan diskusi dan perbandingan jawaban yang kamu lakukan, apa perbedaan perspektif paling penting yang kamu temukan, dan mengapa pemahaman bersama lebih kuat dari pemahaman individual?',
+  modeling: 'Setelah mengikuti simulasi langkah demi langkah, jelaskan secara sistematis bagaimana proses tersebut bekerja dalam jaringan nyata. Apa bagian yang paling krusial dan mengapa?',
+  reflection: 'Hubungkan seluruh konsep yang telah kamu pelajari dalam pertemuan ini. Apa hubungan mendasar antar konsep tersebut dan bagaimana kamu akan menjelaskannya kepada teman yang belum memahaminya?',
+  'authentic-assessment': 'Berdasarkan studi kasus yang kamu selesaikan, jelaskan proses berpikirmu dalam mendiagnosis masalah dan menentukan solusi. Apa yang menjadi dasar setiap keputusanmu?',
+};
+
+const stageNeedsExternalReflection = (type: StageType, lid: string): boolean => {
+  if (type === 'constructivism') return false;
+  if (type === 'inquiry' && lid === '1') return false;
+  if (type === 'questioning' && lid === '1') return false;
+  return true;
+};
+
+function InlineReflectionEssay({ prompt, onDone }: { prompt: string; onDone: (essay: string) => void }) {
+  const [essay, setEssay] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div ref={ref} className="mt-4 rounded-2xl border-2 border-[#628ECB]/20 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-[#628ECB]/8 to-transparent border-b border-[#628ECB]/10">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#628ECB]/10">
+          <Eye className="w-4 h-4 text-[#628ECB]" />
+        </div>
+        <div className="flex-1">
+          <p className="text-[9px] font-black uppercase tracking-widest text-[#628ECB]">Refleksi Mandiri</p>
+          <p className="text-xs font-bold text-[#395886]">Tulis pemahaman atau kesimpulanmu berdasarkan aktivitas ini</p>
+        </div>
+        {submitted && (
+          <span className="flex items-center gap-1 text-[10px] font-bold text-[#10B981] bg-[#10B981]/10 px-2.5 py-1 rounded-full">
+            <CheckCircle className="w-3 h-3" /> Tersimpan
+          </span>
+        )}
+      </div>
+      <div className="p-5">
+        <div className="mb-3 p-3 rounded-xl bg-[#F8FAFF] border border-[#D5DEEF]">
+          <p className="text-xs font-bold text-[#395886] leading-relaxed">{prompt}</p>
+        </div>
+        <textarea
+          value={essay}
+          onChange={e => setEssay(e.target.value)}
+          disabled={submitted}
+          rows={4}
+          className={`w-full p-3 rounded-xl border-2 text-sm leading-relaxed resize-none outline-none transition-all
+            ${submitted
+              ? 'border-[#10B981]/30 bg-[#ECFDF5] text-[#065F46]'
+              : 'border-[#D5DEEF] bg-[#F8FAFF] focus:bg-white focus:border-[#628ECB]'}`}
+          placeholder="Tuliskan refleksimu di sini... (minimal 30 karakter)"
+        />
+        <div className="flex items-center justify-between mt-2">
+          <span className={`text-[10px] font-bold ${essay.length >= 30 ? 'text-[#10B981]' : 'text-[#395886]/40'}`}>
+            {essay.length} karakter{essay.length > 0 && essay.length < 30 ? ` (${30 - essay.length} lagi)` : ''}{essay.length >= 30 ? ' ✓' : ''}
+          </span>
+          {!submitted ? (
+            <button
+              onClick={() => { setSubmitted(true); onDone(essay); }}
+              disabled={essay.length < 30}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs transition-all
+                ${essay.length >= 30
+                  ? 'bg-[#628ECB] text-white hover:bg-[#395886] shadow-sm active:scale-95'
+                  : 'bg-[#EEF2FF] text-[#395886]/30 cursor-not-allowed'}`}
+            >
+              <ArrowRight className="w-3.5 h-3.5" /> Kirim Refleksi
+            </button>
+          ) : (
+            <span className="text-xs font-bold text-[#10B981]">Refleksi berhasil disimpan</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LessonPage() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const [user] = useState(() => getCurrentUser());
   const lesson = lessonId ? lessons[lessonId] : null;
 
-  const [currentStageIndex, setCurrentStageIndex] = useState<number | null>(null);
-  const [progress, setProgress] = useState(() =>
-    getLessonProgress(user!.id, lessonId!)
-  );
-  const [guideVisible, setGuideVisible] = useState(true);
+  const initialProgress = getCachedProgress(user?.id ?? '', lessonId ?? '');
 
-  const fullyCompleted = progress?.pretestCompleted && 
-    progress?.completedStages?.length === (lesson?.stages.length || 0) && 
+  const [progress, setProgress] = useState(
+    initialProgress ?? {
+      lessonId: lessonId ?? '',
+      userId: user?.id ?? '',
+      pretestCompleted: false,
+      completedStages: [] as number[],
+      posttestCompleted: false,
+      answers: {} as Record<string, unknown>,
+      stageAttempts: {} as Record<string, number>,
+      stageSuccess: {} as Record<string, boolean>,
+    },
+  );
+  const [progressLoaded, setProgressLoaded] = useState(!!initialProgress);
+  const [currentStageIndex, setCurrentStageIndex] = useState<number | null>(() => {
+    if (!initialProgress?.pretestCompleted || !lesson) return null;
+    const firstIncomplete = lesson.stages.findIndex((_, index) => !initialProgress.completedStages.includes(index));
+    return firstIncomplete !== -1 ? firstIncomplete : 0;
+  });
+  const [guideVisible, setGuideVisible] = useState(true);
+  const [showStageSummary, setShowStageSummary] = useState(false);
+  const [pendingReflection, setPendingReflection] = useState<{ stageAnswer: unknown } | null>(null);
+
+  useEffect(() => {
+    getLessonProgress(user!.id, lessonId!).then((value) => {
+      setProgress(value);
+      setProgressLoaded(true);
+    });
+  }, [lessonId, user]);
+
+  const fullyCompleted =
+    progress?.pretestCompleted &&
+    progress?.completedStages?.length === (lesson?.stages.length || 0) &&
     progress?.posttestCompleted;
 
   useEffect(() => {
+    if (!progressLoaded) return;
+
     if (!lesson) {
       navigate('/dashboard');
       return;
@@ -161,19 +293,15 @@ export function LessonPage() {
 
     if (currentStageIndex === null) {
       const firstIncomplete = lesson.stages.findIndex(
-        (_, index) => !progress.completedStages.includes(index)
+        (_, index) => !progress.completedStages.includes(index),
       );
-      if (firstIncomplete !== -1) {
-        setCurrentStageIndex(firstIncomplete);
-      } else {
-        setCurrentStageIndex(0);
-      }
+      setCurrentStageIndex(firstIncomplete !== -1 ? firstIncomplete : 0);
     }
-  }, [lesson, progress, navigate, lessonId, currentStageIndex]);
+  }, [currentStageIndex, lesson, lessonId, navigate, progress, progressLoaded]);
 
-  // Reset visibilitas panduan saat tahap berubah
   useEffect(() => {
     setGuideVisible(true);
+    setPendingReflection(null);
   }, [currentStageIndex]);
 
   if (!lesson || currentStageIndex === null) return null;
@@ -184,37 +312,50 @@ export function LessonPage() {
   const displayTitle = getStageDisplayTitle(currentStage.type);
   const stageLearningObjectives =
     stageLearningObjectivesByLesson[lesson.id]?.[currentStage.type] ?? [];
+  const stageGuideSteps =
+    currentStage.activityGuide && currentStage.activityGuide.length > 0
+      ? currentStage.activityGuide
+      : guide.steps;
+  const logicalThinkingIndicators = currentStage.logicalThinkingIndicators ?? [];
+  const facilitatorNotes = currentStage.facilitatorNotes ?? [];
+  const atpAbcd = currentStage.atpAbcd;
 
-  const handleStageComplete = (answer: any) => {
-    saveStageProgress(user!.id, lessonId!, currentStageIndex, answer);
-
-    const updatedProgress = getLessonProgress(user!.id, lessonId!);
+  const handleStageComplete = async (answer: unknown) => {
+    await saveStageProgress(user!.id, lessonId!, currentStageIndex, answer);
+    const updatedProgress = await getLessonProgress(user!.id, lessonId!);
     setProgress(updatedProgress);
-
-    if (isLastStage) {
-      navigate(`/evaluation/${lessonId}`);
-    } else {
-      setCurrentStageIndex(currentStageIndex + 1);
-      window.scrollTo(0, 0);
-    }
+    setPendingReflection(null);
+    window.scrollTo(0, 0);
+    // isStageCompleted will now be true from updatedProgress — the completed view renders automatically
   };
 
   const handleStageClick = (index: number) => {
-    // Tahap dapat diklik hanya jika pertemuan sudah selesai penuh (mode ulasan).
-    // Jika belum selesai, urutan harus ketat — tidak bisa melompat ke tahap lain.
-    // Hanya siswa yang sudah menyelesaikan seluruh tahapan yang dapat menggunakan "akses cepat".
+    // Dapat diklik jika: pelajaran sudah selesai penuh, ATAU tahap ini sudah pernah diselesaikan, ATAU tahap ini adalah tahap berikutnya yang harus dikerjakan
+    const isCompleted = progress.completedStages.includes(index);
+    const isNextToComplete = index === 0 || progress.completedStages.includes(index - 1);
     
-    if (fullyCompleted) {
+    if (fullyCompleted || isCompleted || isNextToComplete) {
       setCurrentStageIndex(index);
       window.scrollTo(0, 0);
     }
   };
 
+  const isStageCompleted = progress.completedStages.some(idx => Number(idx) === currentStageIndex);
+
+  const handleStageActivityComplete = (answer: unknown) => {
+    if (stageNeedsExternalReflection(currentStage.type as StageType, lessonId!)) {
+      setPendingReflection({ stageAnswer: answer });
+    } else {
+      handleStageComplete(answer);
+    }
+  };
+
   const renderStage = () => {
     const commonProps = {
-      onComplete: handleStageComplete,
+      onComplete: handleStageActivityComplete,
       lessonId: lessonId!,
       stageIndex: currentStageIndex,
+      isCompleted: isStageCompleted || pendingReflection !== null,
     };
 
     switch (currentStage.type) {
@@ -228,6 +369,11 @@ export function LessonPage() {
             correctAnswer={currentStage.correctAnswer}
             feedback={currentStage.feedback}
             videoUrl={currentStage.videoUrl}
+            storyScramble={currentStage.storyScramble}
+            analogySortGroups={currentStage.analogySortGroups}
+            analogySortItems={currentStage.analogySortItems}
+            constructivismEssay1={currentStage.constructivismEssay1}
+            constructivismEssay2={currentStage.constructivismEssay2}
           />
         );
       case 'inquiry':
@@ -238,6 +384,13 @@ export function LessonPage() {
             groups={currentStage.groups}
             groupItems={currentStage.groupItems}
             question={currentStage.question}
+            flowItems={currentStage.flowItems}
+            flowInstruction={currentStage.flowInstruction}
+            labelingSlots={currentStage.labelingSlots}
+            labelingLabels={currentStage.labelingLabels}
+            matchingPairs={currentStage.matchingPairs}
+            inquiryReflection1={currentStage.inquiryReflection1}
+            inquiryReflection2={currentStage.inquiryReflection2}
           />
         );
       case 'questioning':
@@ -250,6 +403,7 @@ export function LessonPage() {
             reasonOptions={currentStage.reasonOptions}
             teacherQuestion={currentStage.teacherQuestion}
             questionBank={currentStage.questionBank}
+            problemVisual={currentStage.problemVisual}
           />
         );
       case 'learning-community':
@@ -259,24 +413,23 @@ export function LessonPage() {
             matchingPairs={currentStage.matchingPairs}
             caseScenario={currentStage.caseScenario}
             peerAnswers={currentStage.peerAnswers}
+            peerVotingScenario={currentStage.peerVotingScenario}
+            peerComments={currentStage.peerComments}
+            caseComparisonData={currentStage.caseComparisonData}
+            encapsulationCaseData={currentStage.encapsulationCaseData}
           />
         );
       case 'modeling': {
-        // Data pertemuan mungkin menggunakan `steps` (format sederhana) bukan `modelingSteps`.
-        // Konversi steps → modelingSteps agar komponen selalu menerima data yang bisa digunakan.
-        const modelingStepsData = currentStage.modelingSteps ??
-          currentStage.steps?.map((s) => ({
-            id: s.id,
+        const modelingStepsData =
+          currentStage.modelingSteps ??
+          currentStage.steps?.map((step) => ({
+            id: step.id,
             type: 'example' as const,
-            title: s.title,
-            content: s.description,
+            title: step.title,
+            content: step.description,
           }));
-        return (
-          <ModelingStage
-            {...commonProps}
-            modelingSteps={modelingStepsData}
-          />
-        );
+
+        return <ModelingStage {...commonProps} modelingSteps={modelingStepsData} />;
       }
       case 'reflection':
         return (
@@ -284,6 +437,8 @@ export function LessonPage() {
             {...commonProps}
             essayReflection={currentStage.essayReflection}
             selfEvaluationCriteria={currentStage.selfEvaluationCriteria}
+            conceptMapNodes={currentStage.conceptMapNodes}
+            conceptMapConnections={currentStage.conceptMapConnections}
           />
         );
       case 'authentic-assessment':
@@ -300,26 +455,26 @@ export function LessonPage() {
 
   return (
     <div className="min-h-screen bg-[#F0F3FA]">
-      {/* Header — sesuai gaya dashboard */}
-      <header className="sticky top-0 z-50 w-full border-b border-[#D5DEEF] bg-white/90 shadow-sm backdrop-blur-md transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-50 w-full border-b border-[#C8D8F0] bg-white/95 shadow-md backdrop-blur-md transition-all">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex min-h-[76px] items-center justify-between gap-6">
             <div className="flex min-w-0 items-center gap-4">
               <Link to="/dashboard" className="flex items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#628ECB] shadow-sm">
-                  <BookOpen className="h-6 w-6 text-white" />
+                <div className="hidden min-w-0 sm:block">
+                  <Logo />
                 </div>
-                <div className="hidden sm:block min-w-0">
-                  <p className="truncate text-lg font-bold text-[#395886]">CONNETIC Module</p>
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#628ECB]">Interactive Learning</p>
+                <div className="sm:hidden">
+                  <Logo size="sm" />
                 </div>
               </Link>
-              <div className="h-8 w-px bg-[#D5DEEF] hidden sm:block" />
-              <span className="hidden sm:block text-sm font-bold text-[#628ECB] uppercase tracking-widest">{lesson.title}</span>
+              <div className="hidden h-8 w-px bg-[#D5DEEF] sm:block" />
+              <span className="hidden items-center gap-1.5 rounded-lg border border-[#628ECB]/20 bg-[#628ECB]/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-[#628ECB] sm:inline-flex">
+                {lesson.title}
+              </span>
             </div>
             <Link
               to="/dashboard"
-              className="flex items-center gap-2 text-[#395886] hover:text-[#628ECB] transition-colors text-sm font-semibold"
+              className="flex items-center gap-2 text-sm font-bold text-[#395886] transition-colors hover:text-[#628ECB]"
             >
               <ChevronLeft className="w-4 h-4" />
               <span>Dashboard</span>
@@ -328,157 +483,326 @@ export function LessonPage() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto lg:flex lg:items-start lg:gap-6 px-4 sm:px-6 lg:px-8 py-6">
-        {/* Sidebar (Hanya Desktop) */}
-        <aside className="hidden lg:block lg:w-64 lg:shrink-0 lg:sticky lg:top-[92px]">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:flex lg:items-start lg:gap-6 lg:px-8">
+        <aside className="hidden lg:sticky lg:top-[92px] lg:block lg:w-64 lg:shrink-0">
           <LessonFlowSidebar
             lesson={lesson}
             lessonId={lessonId!}
             progress={progress}
             currentStep={3}
-            currentStageIndex={currentStageIndex ?? 0}
+            currentStageIndex={currentStageIndex}
             fullyCompleted={fullyCompleted}
             onStageClick={handleStageClick}
           />
         </aside>
 
-        {/* Area Konten Utama */}
-        <main className="flex-1 min-w-0">
-          {/* Header Mobile — bilah tunggal ringkas */}
-          <div className="lg:hidden mb-4">
-            <div className="bg-white rounded-2xl border border-[#D5DEEF] shadow-sm px-4 py-3">
-              <div className="flex items-center justify-between gap-3 mb-2.5">
-                <div className="min-w-0">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[#628ECB]">{lesson.title}</span>
-                  <p className="text-xs font-bold text-[#395886] truncate">{lesson.topic}</p>
-                </div>
-                <span className="text-[10px] font-bold text-[#628ECB] bg-[#628ECB]/10 px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap">
-                  Tahap {currentStageIndex + 1}/{lesson.stages.length}
+        <main className="min-w-0 flex-1 flex flex-col gap-6">
+          {/* Mobile Progress Bar */}
+          <div className="lg:hidden rounded-2xl border border-[#D5DEEF] bg-white px-4 py-3 shadow-sm">
+            <div className="mb-2.5 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#628ECB]">
+                  {lesson.title}
                 </span>
+                <p className="truncate text-xs font-bold text-[#395886]">{lesson.topic}</p>
               </div>
-              {/* Titik alur ringkas */}
-              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-                {lesson.stages.map((stage, index) => {
-                  const completed = progress.completedStages.includes(index);
-                  const isCurrent = index === currentStageIndex;
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => handleStageClick(index)}
-                      disabled={!fullyCompleted}
-                      title={getStageDisplayTitle(stage.type)}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border shrink-0 transition-all text-[10px] font-bold ${
-                        isCurrent ? 'bg-[#628ECB] border-[#628ECB] text-white' : completed ? 'bg-[#10B981]/10 border-[#10B981]/20 text-[#10B981]' : 'bg-white border-[#D5DEEF] text-[#395886]/35'
-                      } ${!fullyCompleted ? 'cursor-default' : 'cursor-pointer'}`}
-                    >
-                      <div className={`h-1.5 w-1.5 rounded-full shrink-0 ${isCurrent ? 'bg-white' : completed ? 'bg-[#10B981]' : 'bg-[#D5DEEF]'}`} />
-                      {getStageDisplayTitle(stage.type)}
-                    </button>
-                  );
-                })}
-              </div>
+              <span className="shrink-0 whitespace-nowrap rounded-lg bg-[#628ECB]/10 px-2.5 py-1 text-[10px] font-bold text-[#628ECB]">
+                Tahap {currentStageIndex + 1}/{lesson.stages.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+              {lesson.stages.map((stage, index) => {
+                const completed = progress.completedStages.includes(index);
+                const isCurrent = index === currentStageIndex;
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleStageClick(index)}
+                    disabled={!fullyCompleted}
+                    title={getStageDisplayTitle(stage.type)}
+                    className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-bold transition-all ${
+                      isCurrent
+                        ? 'border-[#628ECB] bg-[#628ECB] text-white'
+                        : completed
+                          ? 'border-[#10B981]/20 bg-[#10B981]/10 text-[#10B981]'
+                          : 'border-[#D5DEEF] bg-white text-[#395886]/35'
+                    } ${!fullyCompleted ? 'cursor-default' : 'cursor-pointer'}`}
+                  >
+                    <div
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                        isCurrent ? 'bg-white' : completed ? 'bg-[#10B981]' : 'bg-[#D5DEEF]'
+                      }`}
+                    />
+                    {getStageDisplayTitle(stage.type)}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Kartu Header Tahap */}
-          <div className="mb-6 bg-white rounded-[2rem] border border-[#D5DEEF] shadow-sm overflow-hidden">
-            <div className={`px-6 py-5 flex items-center justify-between gap-4 border-b ${guide?.borderColor} ${guide?.bgColor}`}>
-              <div className="flex items-center gap-4">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm ${guide?.accentColor}`}>
-                  {guide?.icon}
+          {/* STAGE HEADER CARD */}
+          <div className={`relative overflow-hidden rounded-2xl border-2 shadow-sm transition-colors duration-500 ${guide.borderColor} ${guide.bgColor}`}>
+            <div className="p-5 sm:p-6 space-y-4">
+
+              {/* Header row */}
+              <div className="flex items-start gap-4">
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ${guide.accentColor}`}>
+                  {guide.icon}
                 </div>
-                <div>
-                  <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${guide?.accentColor}`}>
+                <div className="flex-1 min-w-0">
+                  <span className={`inline-block rounded-full bg-white px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest shadow-sm mb-1 ${guide.accentColor}`}>
                     Tahapan CTL
+                  </span>
+                  <h1 className="text-base sm:text-lg font-bold text-[#395886] mb-0.5 tracking-tight">{displayTitle}</h1>
+                  <p className="text-[11px] leading-relaxed text-[#395886]/60">
+                    {stageCtlDescriptions[currentStage.type as StageType]}
                   </p>
-                  <h1 className="text-2xl font-extrabold text-[#395886]">{displayTitle}</h1>
                 </div>
               </div>
-              {currentStage.objectiveCode && (
-                <div className="hidden sm:block">
-                  <span className={`text-[11px] font-bold px-3 py-1 rounded-full border-2 ${guide?.borderColor} ${guide?.accentColor} bg-white/50`}>
-                    {currentStage.objectiveCode}
-                  </span>
+
+              {/* Integrated ATP + Guide card */}
+              <div className="space-y-3">
+
+                {/* ATP objectives — always visible */}
+                {stageLearningObjectives.length > 0 && (
+                  <div className="rounded-xl border border-white/70 bg-white/50 overflow-hidden px-4 pt-3 pb-4">
+                    <p className={`text-[9px] font-black uppercase tracking-widest mb-2 ${guide.accentColor}`}>
+                      Tujuan Pembelajaran (ATP)
+                    </p>
+                    <div className="space-y-1.5">
+                      {stageLearningObjectives.map((obj) => (
+                        <p key={obj.code} className="text-[11px] leading-relaxed text-[#395886]/70">
+                          <span className="font-bold text-[#395886]/90">{obj.code}:</span>{' '}
+                          {obj.atpAbcd
+                            ? `(A) ${obj.atpAbcd.audience} (B) ${obj.atpAbcd.behavior} (C) ${obj.atpAbcd.condition} (D) ${obj.atpAbcd.degree}`
+                            : obj.description}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Panduan Aktivitas accordion — with spacing from ATP */}
+                <div className="rounded-xl border border-white/70 bg-white/50 overflow-hidden">
+                  <button
+                    onClick={() => setGuideVisible(!guideVisible)}
+                    className={`flex w-full items-center justify-between px-4 py-2.5 transition-all hover:bg-white/40 ${guide.accentColor}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Info className="h-3.5 w-3.5" />
+                      <span className="text-[11px] font-bold">Panduan Aktivitas Siswa</span>
+                    </div>
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-300 ${guideVisible ? 'rotate-180' : ''}`} />
+                  </button>
+                  <div className={`grid transition-all duration-300 ease-in-out ${guideVisible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                    <div className="overflow-hidden">
+                      <ol className="space-y-2 px-4 pb-3">
+                        {stageGuideSteps.map((step, index) => (
+                          <li
+                            key={`${currentStage.type}-${index}`}
+                            className="flex items-start gap-3 text-[11px] font-medium text-[#395886]/75"
+                          >
+                            <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white text-[9px] font-black shadow-sm ${guide.accentColor}`}>
+                              {index + 1}
+                            </span>
+                            <span className="leading-relaxed">{step}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
-            
-            <div className="px-6 py-5 bg-gray-50/30">
-              <p className="text-[#395886]/75 text-sm font-medium leading-relaxed">{currentStage.description}</p>
-              {stageLearningObjectives.length > 0 && (
-                <div className="mt-5 rounded-2xl border border-[#D5DEEF] bg-white p-4">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <h2 className="text-sm font-black text-[#395886]">Tujuan Pembelajaran</h2>
-                    {currentStage.objectiveCode && (
-                      <span className="text-[11px] font-bold text-[#628ECB]">
-                        {currentStage.objectiveCode}
-                      </span>
+              </div>
+
+              {/* ADMIN ONLY */}
+              {user?.role === 'admin' && (atpAbcd || logicalThinkingIndicators.length > 0 || facilitatorNotes.length > 0) && (
+                <div className="pt-3 border-t border-white/50">
+                  <div className="mb-3 inline-flex items-center gap-2 rounded-lg bg-red-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-red-600">
+                    Mode Admin / Guru
+                  </div>
+                  <div className="grid gap-3 xl:grid-cols-3">
+                    {atpAbcd && (
+                      <div className="rounded-xl border border-white/50 bg-white/40 p-3 backdrop-blur-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                          <BookOpen className="h-3.5 w-3.5 text-[#628ECB]" />
+                          <h2 className="text-xs font-black text-[#395886]">ATP (ABCD)</h2>
+                        </div>
+                        <div className="space-y-1.5 text-[11px] text-[#395886]/80">
+                          <div className="rounded-lg bg-white/50 px-2.5 py-1.5"><span className="font-black text-[#395886]">A</span>: {atpAbcd.audience}</div>
+                          <div className="rounded-lg bg-white/50 px-2.5 py-1.5"><span className="font-black text-[#395886]">B</span>: {atpAbcd.behavior}</div>
+                          <div className="rounded-lg bg-white/50 px-2.5 py-1.5"><span className="font-black text-[#395886]">C</span>: {atpAbcd.condition}</div>
+                          <div className="rounded-lg bg-white/50 px-2.5 py-1.5"><span className="font-black text-[#395886]">D</span>: {atpAbcd.degree}</div>
+                        </div>
+                      </div>
+                    )}
+                    {logicalThinkingIndicators.length > 0 && (
+                      <div className="rounded-xl border border-white/50 bg-white/40 p-3 backdrop-blur-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CheckCircle className="h-3.5 w-3.5 text-[#10B981]" />
+                          <h2 className="text-xs font-black text-[#395886]">Logical Thinking</h2>
+                        </div>
+                        <div className="space-y-1.5">
+                          {logicalThinkingIndicators.map((ind) => (
+                            <div key={ind} className="rounded-lg bg-white/50 px-2.5 py-1.5 text-[11px] leading-relaxed text-[#395886]/80">{ind}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {facilitatorNotes.length > 0 && (
+                      <div className="rounded-xl border border-white/50 bg-white/40 p-3 backdrop-blur-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Info className="h-3.5 w-3.5 text-[#F59E0B]" />
+                          <h2 className="text-xs font-black text-[#395886]">Peran Guru</h2>
+                        </div>
+                        <div className="space-y-1.5">
+                          {facilitatorNotes.map((note) => (
+                            <div key={note} className="rounded-lg bg-white/50 px-2.5 py-1.5 text-[11px] leading-relaxed text-[#395886]/80">{note}</div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
-                  <div className="mt-3 space-y-3">
-                    {stageLearningObjectives.map((objective) => (
-                      <div key={objective.code} className="rounded-2xl bg-[#F8FAFC] px-4 py-3">
-                        <p className="text-xs font-black text-[#395886]">{objective.code}</p>
-                        <p className="mt-1 text-xs font-medium leading-relaxed text-[#395886]/80">
-                          {objective.description}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Panduan Instruksi Tahap */}
-          {guideVisible && guide && (
-            <div className={`mb-6 rounded-[2rem] border-2 ${guide.borderColor} ${guide.bgColor} p-6 shadow-sm`}>
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 flex-1">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm mt-0.5 ${guide.accentColor}`}>
-                    <Info className="w-5 h-5" />
+          {/* STAGE CONTENT — show interactive stage only if not yet completed */}
+          {isStageCompleted && pendingReflection === null ? (
+            /* COMPLETED STAGE VIEW */
+            <div className="flex flex-col gap-4">
+              {/* Tahap Selesai Banner */}
+              <div className="rounded-2xl border-2 border-[#10B981]/30 bg-gradient-to-r from-[#ECFDF5] to-white p-5 flex items-center gap-4 shadow-sm">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#10B981] shadow-md">
+                  <CheckCircle className="w-6 h-6 text-white" strokeWidth={2.5} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#10B981]">Tahap Selesai</p>
+                  <p className="text-base font-bold text-[#065F46]">{displayTitle} berhasil diselesaikan</p>
+                  <p className="text-xs text-[#10B981]/70 mt-0.5">Jawabanmu telah tersimpan. Review lengkap tersedia setelah semua tahapan selesai.</p>
+                </div>
+              </div>
+
+              {/* Saved answer preview */}
+              {progress.answers[currentStageIndex] && (
+                <div className="bg-white rounded-2xl border-2 border-[#D5DEEF] shadow-sm overflow-hidden">
+                  <div className="flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-[#628ECB]/8 to-transparent border-b border-[#628ECB]/10">
+                    <Eye className="w-4 h-4 text-[#628ECB]" />
+                    <p className="text-xs font-bold text-[#395886]">Ringkasan Jawaban Kamu</p>
                   </div>
-                  <div>
-                    <p className={`text-sm font-bold mb-2 ${guide.accentColor}`}>
-                      Panduan Aktivitas
-                    </p>
-                    <ol className="space-y-2">
-                      {guide.steps.map((step, i) => (
-                        <li key={i} className="flex items-start gap-3 text-[13px] text-[#395886]/80 font-medium">
-                          <span className={`shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-black shadow-sm mt-0.5 ${guide.accentColor}`}>
-                            {i + 1}
-                          </span>
-                          {step}
-                        </li>
-                      ))}
-                    </ol>
+                  <div className="p-5">
+                    <StageAnswerDetail stage={currentStage} answer={progress.answers[currentStageIndex]} />
                   </div>
                 </div>
+              )}
+
+              {/* Reflection if present */}
+              {(progress.answers[currentStageIndex] as any)?.reflection && (
+                <div className="bg-white rounded-2xl border-2 border-[#628ECB]/20 shadow-sm overflow-hidden">
+                  <div className="flex items-center gap-3 px-5 py-3 bg-[#628ECB]/5 border-b border-[#628ECB]/10">
+                    <Eye className="w-4 h-4 text-[#628ECB]" />
+                    <p className="text-xs font-bold text-[#395886]">Refleksi Mandiri Kamu</p>
+                  </div>
+                  <div className="p-5">
+                    <p className="text-sm text-[#395886] leading-relaxed">{(progress.answers[currentStageIndex] as any).reflection}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Single Lanjutkan button */}
+              <div className="flex items-center justify-between py-4 border-t border-[#D5DEEF]">
+                <div className="flex items-center gap-2 text-xs text-[#10B981] font-semibold">
+                  <CheckCircle className="w-4 h-4" />
+                  Tahap selesai dikerjakan
+                </div>
                 <button
-                  onClick={() => setGuideVisible(false)}
-                  className="shrink-0 text-xs font-bold text-[#395886]/40 hover:text-[#395886] transition-colors mt-1"
+                  onClick={() => {
+                    if (isLastStage) {
+                      setShowStageSummary(true);
+                    } else {
+                      setCurrentStageIndex(currentStageIndex + 1);
+                      window.scrollTo(0, 0);
+                    }
+                  }}
+                  className="flex items-center gap-2 bg-[#628ECB] text-white px-6 py-2.5 rounded-xl hover:bg-[#395886] transition-all font-bold text-sm shadow-md active:scale-95"
                 >
-                  Sembunyikan
+                  {isLastStage ? 'Selesaikan Aktivitas' : 'Lanjutkan'}
+                  <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
-          )}
-
-          {!guideVisible && (
-            <div className="mb-4 text-right">
-              <button
-                onClick={() => setGuideVisible(true)}
-                className={`inline-flex items-center gap-2 text-xs font-bold ${guide?.accentColor} hover:opacity-80 transition-opacity bg-white px-4 py-2 rounded-xl border border-[#D5DEEF] shadow-sm`}
-              >
-                <Info className="w-4 h-4" />
-                Tampilkan panduan
-              </button>
+          ) : (
+            /* INTERACTIVE STAGE */
+            <div className="w-full">
+              <DndProvider backend={HTML5Backend}>
+                {renderStage()}
+              </DndProvider>
+              {/* Inline reflection essay — appears after activity complete, before stage is saved */}
+              {pendingReflection !== null && (
+                <InlineReflectionEssay
+                  prompt={stageReflectionPrompts[currentStage.type as StageType]}
+                  onDone={(essay) => handleStageComplete({ ...(pendingReflection.stageAnswer as object), reflection: essay })}
+                />
+              )}
             </div>
           )}
-
-          {renderStage()}
         </main>
       </div>
+
+      <Dialog open={showStageSummary} onOpenChange={() => {}}>
+        <DialogContent
+          className="overflow-hidden rounded-[2rem] border-none p-0 shadow-2xl sm:max-w-[400px]"
+          onInteractOutside={(event) => event.preventDefault()}
+        >
+          <div className="relative p-8 text-center">
+            <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#628ECB]/10 to-white" />
+
+            <div className="relative mb-6 inline-block">
+              <div className="absolute inset-0 h-20 w-20 rotate-12 rounded-3xl bg-gradient-to-br from-[#395886] to-[#628ECB] opacity-40 blur-lg animate-pulse" />
+              <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-[#395886] to-[#628ECB] shadow-xl">
+                <Trophy className="h-10 w-10 text-white" />
+              </div>
+              <div className="absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full border-4 border-white bg-[#10B981] text-white shadow-lg">
+                <CheckCircle className="h-4 w-4" strokeWidth={3} />
+              </div>
+            </div>
+
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-2xl font-black leading-tight tracking-tight text-[#395886]">
+                Luar biasa!
+              </DialogTitle>
+            </DialogHeader>
+
+            <p className="mt-3 px-2 text-sm font-medium leading-relaxed text-[#395886]/70">
+              Kamu telah menuntaskan seluruh tahapan CTL pada pertemuan ini. Lanjutkan ke post-test, tinjau kembali hasil belajarmu, atau unduh rekap PDF.
+            </p>
+
+            <div className="mt-8 space-y-3">
+              <button
+                onClick={() => {
+                  setShowStageSummary(false);
+                  navigate(`/evaluation/${lessonId}`);
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#395886] py-4 text-sm font-bold text-white shadow-lg shadow-[#395886]/20 transition-all hover:bg-[#628ECB] active:scale-95"
+              >
+                Lanjut ke Post-Test
+                <ArrowRight className="h-4 w-4" />
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowStageSummary(false);
+                  navigate(`/review/${lessonId}`);
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-[#628ECB]/30 bg-[#628ECB]/5 py-3 text-sm font-bold text-[#395886] transition-all hover:bg-[#628ECB]/10 active:scale-95"
+              >
+                <Eye className="h-4 w-4 text-[#628ECB]" />
+                Review Tahapan Pembelajaran
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

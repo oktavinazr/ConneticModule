@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router';
 import {
   BookOpen,
@@ -11,12 +11,24 @@ import {
   FileText,
   Info,
   ChevronRight,
+  AlertCircle,
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import { TestQuestion } from '../data/lessons';
 import { lessons } from '../data/lessons';
 import { getLessonProgress } from '../utils/progress';
 import { getCurrentUser } from '../utils/auth';
 import { LessonFlowSidebar } from './LessonFlowSidebar';
+import { Logo } from './layout/Logo';
 
 interface TestPageProps {
   title: string;
@@ -67,15 +79,21 @@ export function TestPage({
   const [timeRemaining, setTimeRemaining] = useState<number | null>(
     duration && !initialShowResults ? duration * 60 : null
   );
+  const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
+  const [pendingSubmitData, setPendingSubmitData] = useState<{ score: number; answers: number[] } | null>(null);
 
   // Data sidebar (saat digunakan di dalam alur pertemuan)
   const sidebarLesson = lessonFlow?.lessonId ? lessons[lessonFlow.lessonId] : null;
   const sidebarUser = getCurrentUser();
-  const sidebarProgress = lessonFlow?.lessonId && sidebarUser
-    ? getLessonProgress(sidebarUser.id, lessonFlow.lessonId)
-    : null;
+  const [sidebarProgress, setSidebarProgress] = useState<import('../utils/progress').LessonProgress | null>(null);
   const sidebarFullyCompleted = !!(lessonFlow?.pretestCompleted && lessonFlow.allStagesCompleted && lessonFlow.posttestCompleted);
   const hasSidebar = !!(sidebarLesson && sidebarProgress && lessonFlow?.lessonId);
+
+  useEffect(() => {
+    if (lessonFlow?.lessonId && sidebarUser) {
+      getLessonProgress(sidebarUser.id, lessonFlow.lessonId).then(setSidebarProgress as any);
+    }
+  }, [lessonFlow?.lessonId]);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -112,15 +130,28 @@ export function TestPage({
   const handleNext = () => {
     if (selectedAnswer === null) return;
     const newAnswers = [...answers, selectedAnswer];
-    setAnswers(newAnswers);
     if (currentQuestionIndex < questions.length - 1) {
+      setAnswers(newAnswers);
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setSelectedAnswer(null);
       return;
     }
     const score = newAnswers.filter((ans, idx) => ans === questions[idx].correctAnswer).length;
-    onComplete(score, newAnswers);
+    setPendingSubmitData({ score, answers: newAnswers });
+    setShowConfirmSubmit(true);
+  };
+
+  const handleConfirmSubmit = () => {
+    if (!pendingSubmitData) return;
+    setAnswers(pendingSubmitData.answers);
+    onComplete(pendingSubmitData.score, pendingSubmitData.answers);
+    setShowConfirmSubmit(false);
     setShowResults(true);
+  };
+
+  const handleCancelSubmit = () => {
+    setShowConfirmSubmit(false);
+    setPendingSubmitData(null);
   };
 
   const score =
@@ -150,32 +181,33 @@ export function TestPage({
   if (showResults) {
     return (
       <div className="min-h-screen bg-[#F0F3FA]">
-        <header className="sticky top-0 z-50 w-full border-b border-[#D5DEEF] bg-white/90 shadow-sm backdrop-blur-md transition-all">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex min-h-[76px] items-center justify-between gap-6">
-              <div className="flex min-w-0 items-center gap-4">
-                <Link to={backPath} className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#628ECB] shadow-sm">
-                    <BookOpen className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="hidden sm:block min-w-0">
-                    <p className="truncate text-lg font-bold text-[#395886]">CONNETIC Module</p>
-                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#628ECB]">Interactive Learning</p>
-                  </div>
-                </Link>
-                <div className="h-8 w-px bg-[#D5DEEF] hidden sm:block" />
-                <span className="hidden sm:block text-sm font-bold text-[#628ECB] uppercase tracking-widest">{title}</span>
-              </div>
-              <Link
-                to={backPath}
-                className="flex items-center gap-2 text-[#395886] hover:text-[#628ECB] transition-colors text-sm font-semibold"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Kembali</span>
+      <header className="sticky top-0 z-50 w-full border-b border-[#C8D8F0] bg-white/95 shadow-md backdrop-blur-md transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex min-h-[76px] items-center justify-between gap-6">
+            <div className="flex min-w-0 items-center gap-4">
+              <Link to={backPath} className="flex items-center gap-3">
+                <div className="hidden sm:block min-w-0">
+                  <Logo />
+                </div>
+                <div className="sm:hidden">
+                  <Logo size="sm" />
+                </div>
               </Link>
+              <div className="h-8 w-px bg-[#D5DEEF] hidden sm:block" />
+              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-[#628ECB]/10 px-3 py-1 text-xs font-bold text-[#628ECB] uppercase tracking-widest border border-[#628ECB]/20">
+                {title}
+              </span>
             </div>
+            <Link
+              to={backPath}
+              className="flex items-center gap-2 text-[#395886] hover:text-[#628ECB] transition-colors text-sm font-bold"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Kembali</span>
+            </Link>
           </div>
-        </header>
+        </div>
+      </header>
 
         <div className="max-w-7xl mx-auto lg:flex lg:items-start lg:gap-6 px-4 sm:px-6 lg:px-8 py-6">
           {hasSidebar && (
@@ -190,98 +222,44 @@ export function TestPage({
             </aside>
           )}
           <main className="flex-1 min-w-0">
-          {/* Kartu Skor */}
-          <div className="bg-white rounded-[2rem] shadow-md border border-[#D5DEEF] overflow-hidden mb-6">
-            <div className="bg-gradient-to-br from-[#395886] to-[#628ECB] px-8 py-8 text-center">
-              <div className="mb-4 flex justify-center">
-                <div className="relative flex h-28 w-28 items-center justify-center rounded-full bg-white/20 shadow-lg ring-4 ring-white/30">
-                  <span className="text-4xl font-black text-white">{percentage}<span className="text-xl">%</span></span>
+          {/* Kartu Skor — compact & modern */}
+          <div className="bg-white rounded-3xl shadow-md border border-[#D5DEEF] overflow-hidden mb-5">
+            <div className="bg-gradient-to-br from-[#395886] via-[#4A6FA8] to-[#628ECB] px-6 py-6">
+              <div className="flex items-center gap-5">
+                <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-white/20 shadow-lg ring-2 ring-white/30">
+                  <span className="text-2xl font-black text-white leading-none">{percentage}<span className="text-base">%</span></span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-lg font-extrabold text-white leading-tight">{title} Selesai!</h1>
+                  <p className="text-white/70 text-sm mt-1">
+                    <span className="font-bold text-white">{score}</span> dari <span className="font-bold text-white">{questions.length}</span> soal dijawab benar
+                  </p>
+                  <div className={`mt-2 inline-flex items-center gap-1.5 rounded-full ${scoreColor.light} ${scoreColor.border} border px-3 py-1`}>
+                    <span className={`text-xs font-black ${scoreColor.text}`}>{scoreColor.msg}</span>
+                    <span className={`text-[10px] font-semibold ${scoreColor.text}/70`}>— {percentage >= 70 ? 'Lulus' : 'Belum Lulus'}</span>
+                  </div>
+                </div>
+                <div className="hidden sm:flex flex-col items-end gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-white/80 bg-white/15 px-3 py-1.5 rounded-xl">
+                    <CheckCircle className="h-3.5 w-3.5 text-[#34D399]" />{score} Benar
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-white/80 bg-white/15 px-3 py-1.5 rounded-xl">
+                    <XCircle className="h-3.5 w-3.5 text-red-300" />{questions.length - score} Salah
+                  </div>
                 </div>
               </div>
-              <h1 className="text-2xl font-bold text-white mb-1">{title} Selesai!</h1>
-              <p className="text-white/70 text-sm">
-                Kamu menjawab <span className="font-bold text-white">{score}</span> dari <span className="font-bold text-white">{questions.length}</span> soal dengan benar
-              </p>
             </div>
-            <div className={`mx-6 my-5 rounded-2xl ${scoreColor.light} ${scoreColor.border} border-2 px-6 py-4 text-center`}>
-              <p className={`text-lg font-bold ${scoreColor.text}`}>{scoreColor.msg}</p>
-              <p className={`text-sm ${scoreColor.text}/80 mt-0.5`}>{scoreColor.sub}</p>
-            </div>
-          </div>
-
-          {/* Ulasan Jawaban — diperluas untuk keterbacaan lebih baik */}
-          <div className="bg-white rounded-[2rem] shadow-md border border-[#D5DEEF] overflow-hidden mb-8">
-            <div className="flex items-center gap-3 border-b border-[#D5DEEF] px-8 py-5 bg-[#F8FAFD]">
-              <FileText className="h-5 w-5 text-[#628ECB]" />
-              <h2 className="text-base font-bold text-[#395886]">Review Jawaban Lengkap</h2>
-              <span className="ml-auto flex items-center gap-4 text-sm font-bold">
-                <span className="flex items-center gap-1.5 text-[#10B981] bg-[#10B981]/10 px-3 py-1 rounded-full border border-[#10B981]/20"><CheckCircle className="h-4 w-4" />{score} Benar</span>
-                <span className="flex items-center gap-1.5 text-red-500 bg-red-50 px-3 py-1 rounded-full border border-red-100"><XCircle className="h-4 w-4" />{questions.length - score} Salah</span>
-              </span>
-            </div>
-
-            <div className="p-8 space-y-8">
-              {questions.map((q, index) => {
-                const studentAnswer = answers[index];
-                const isCorrect = studentAnswer === q.correctAnswer;
-                return (
-                  <div key={index} className={`rounded-[1.5rem] border-2 p-6 transition-all ${isCorrect ? 'border-[#10B981]/20 bg-[#10B981]/[0.02]' : 'border-red-100 bg-red-50/[0.02]'}`}>
-                    <div className="mb-5 flex gap-4">
-                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-black shadow-sm ${isCorrect ? 'bg-[#10B981] text-white' : 'bg-red-500 text-white'}`}>
-                        {index + 1}
-                      </span>
-                      <p className="font-bold text-[#395886] leading-relaxed text-base">{q.question}</p>
-                    </div>
-                    
-                    <div className="ml-12 grid gap-2.5">
-                      {q.options.map((opt, j) => {
-                        const isStudentChoice = studentAnswer === j;
-                        const isCorrectChoice = q.correctAnswer === j;
-                        
-                        let cls = 'flex items-start gap-3 rounded-xl border-2 p-4 text-sm font-medium transition-all ';
-                        if (isCorrectChoice) {
-                          cls += 'border-[#10B981] bg-[#10B981]/10 text-[#0F8A66] shadow-sm';
-                        } else if (isStudentChoice && !isCorrect) {
-                          cls += 'border-red-400 bg-red-50 text-red-700 shadow-sm';
-                        } else {
-                          cls += 'border-[#D5DEEF] bg-white text-[#395886]/50';
-                        }
-
-                        return (
-                          <div key={j} className={cls}>
-                            <span className={`shrink-0 font-black w-5 ${isCorrectChoice ? 'text-[#0F8A66]' : isStudentChoice ? 'text-red-700' : 'text-[#395886]/30'}`}>
-                              {OPTION_LABELS[j]}.
-                            </span>
-                            <span className="flex-1 leading-relaxed">{opt}</span>
-                            {isCorrectChoice && <CheckCircle className="ml-auto h-5 w-5 shrink-0 text-[#10B981]" />}
-                            {isStudentChoice && !isCorrect && <XCircle className="ml-auto h-5 w-5 shrink-0 text-red-500" />}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {!isCorrect && typeof studentAnswer === 'number' && (
-                      <div className="ml-12 mt-4 flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-100 px-4 py-2 font-bold text-red-600 text-xs shadow-sm">
-                          <XCircle className="h-3.5 w-3.5" /> Jawaban kamu: <span className="bg-red-200/50 px-1.5 rounded ml-1">{OPTION_LABELS[studentAnswer]}</span>
-                        </div>
-                        <div className="flex items-center gap-2 rounded-xl bg-[#10B981]/5 border border-[#10B981]/20 px-4 py-2 font-bold text-[#10B981] text-xs shadow-sm">
-                          <CheckCircle className="h-3.5 w-3.5" /> Benar: <span className="bg-[#10B981]/20 px-1.5 rounded ml-1">{OPTION_LABELS[q.correctAnswer]}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className={`px-6 py-3 bg-gradient-to-r ${scoreColor.light} border-t ${scoreColor.border}`}>
+              <p className={`text-sm font-medium ${scoreColor.text}/80`}>{scoreColor.sub}</p>
             </div>
           </div>
 
           {/* Tombol Aksi Akhir */}
-          <div className="text-center">
+          <div className="mb-5 flex justify-center">
             {reflectionPath ? (
               <Link
                 to={reflectionPath}
-                className="inline-flex items-center gap-2 bg-[#F59E0B] text-white px-10 py-4 rounded-2xl hover:bg-[#D97706] transition-all shadow-lg font-black text-sm active:scale-95"
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-[#F59E0B] to-[#D97706] text-white px-8 py-3.5 rounded-2xl hover:from-[#D97706] hover:to-[#B45309] transition-all shadow-lg font-black text-sm active:scale-95"
               >
                 Lanjut ke Refleksi Belajar
                 <ChevronRight className="h-5 w-5" strokeWidth={3} />
@@ -289,7 +267,8 @@ export function TestPage({
             ) : (
               <Link
                 to={backPath}
-                className="inline-flex items-center gap-2 bg-[#628ECB] text-white px-8 py-3.5 rounded-2xl hover:bg-[#395886] transition-colors shadow-md font-bold"
+                state={isLessonPretest ? { pretestJustCompleted: true } : undefined}
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-[#395886] to-[#628ECB] text-white px-8 py-3.5 rounded-2xl hover:from-[#2E4A75] hover:to-[#4A79BA] transition-all shadow-md font-bold active:scale-95"
               >
                 {isLessonPretest ? (
                   <>
@@ -305,6 +284,73 @@ export function TestPage({
               </Link>
             )}
           </div>
+
+          {/* Ulasan Jawaban — compact */}
+          <div className="bg-white rounded-3xl shadow-md border border-[#D5DEEF] overflow-hidden mb-6">
+            <div className="flex items-center gap-3 border-b border-[#D5DEEF] px-6 py-4 bg-[#F8FAFD]">
+              <FileText className="h-4 w-4 text-[#628ECB]" />
+              <h2 className="text-sm font-bold text-[#395886]">Preview Jawaban</h2>
+              <span className="ml-auto flex items-center gap-3 text-xs font-bold">
+                <span className="flex items-center gap-1 text-[#10B981] bg-[#10B981]/10 px-2.5 py-1 rounded-full border border-[#10B981]/20"><CheckCircle className="h-3.5 w-3.5" />{score} Benar</span>
+                <span className="flex items-center gap-1 text-red-500 bg-red-50 px-2.5 py-1 rounded-full border border-red-100"><XCircle className="h-3.5 w-3.5" />{questions.length - score} Salah</span>
+              </span>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {questions.map((q, index) => {
+                const studentAnswer = answers[index];
+                const isCorrect = studentAnswer === q.correctAnswer;
+                return (
+                  <div key={index} className={`rounded-2xl border p-4 transition-all ${isCorrect ? 'border-[#10B981]/25 bg-[#10B981]/[0.025]' : 'border-red-100 bg-red-50/30'}`}>
+                    <div className="mb-3 flex gap-3">
+                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-xs font-black shadow-sm ${isCorrect ? 'bg-[#10B981] text-white' : 'bg-red-500 text-white'}`}>
+                        {index + 1}
+                      </span>
+                      <p className="font-semibold text-[#395886] leading-snug text-sm">{q.question}</p>
+                    </div>
+
+                    <div className="ml-10 grid gap-1.5">
+                      {q.options.map((opt, j) => {
+                        const isStudentChoice = studentAnswer === j;
+                        const isCorrectChoice = q.correctAnswer === j;
+
+                        let cls = 'flex items-center gap-2.5 rounded-xl border px-3 py-2 text-xs font-medium transition-all ';
+                        if (isCorrectChoice) {
+                          cls += 'border-[#10B981] bg-[#10B981]/10 text-[#0F8A66]';
+                        } else if (isStudentChoice && !isCorrect) {
+                          cls += 'border-red-300 bg-red-50 text-red-700';
+                        } else {
+                          cls += 'border-[#E5EBF5] bg-white text-[#395886]/40';
+                        }
+
+                        return (
+                          <div key={j} className={cls}>
+                            <span className={`shrink-0 font-black w-4 ${isCorrectChoice ? 'text-[#0F8A66]' : isStudentChoice ? 'text-red-700' : 'text-[#395886]/25'}`}>
+                              {OPTION_LABELS[j]}.
+                            </span>
+                            <span className="flex-1 leading-snug">{opt}</span>
+                            {isCorrectChoice && <CheckCircle className="ml-auto h-4 w-4 shrink-0 text-[#10B981]" />}
+                            {isStudentChoice && !isCorrect && <XCircle className="ml-auto h-4 w-4 shrink-0 text-red-500" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {!isCorrect && typeof studentAnswer === 'number' && (
+                      <div className="ml-10 mt-2.5 flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1.5 rounded-lg bg-red-50 border border-red-100 px-3 py-1.5 font-bold text-red-600 text-[10px]">
+                          <XCircle className="h-3 w-3" /> Jawaban kamu: <span className="font-black ml-0.5">{OPTION_LABELS[studentAnswer]}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 rounded-lg bg-[#10B981]/5 border border-[#10B981]/20 px-3 py-1.5 font-bold text-[#10B981] text-[10px]">
+                          <CheckCircle className="h-3 w-3" /> Jawaban benar: <span className="font-black ml-0.5">{OPTION_LABELS[q.correctAnswer]}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </main>
       </div>
       </div>
@@ -316,32 +362,33 @@ export function TestPage({
   if (!started) {
     return (
       <div className="min-h-screen bg-[#F0F3FA]">
-        <header className="sticky top-0 z-50 w-full border-b border-[#D5DEEF] bg-white/90 shadow-sm backdrop-blur-md transition-all">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex min-h-[76px] items-center justify-between gap-6">
-              <div className="flex min-w-0 items-center gap-4">
-                <Link to={backPath} className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#628ECB] shadow-sm">
-                    <BookOpen className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="hidden sm:block min-w-0">
-                    <p className="truncate text-lg font-bold text-[#395886]">CONNETIC Module</p>
-                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#628ECB]">Interactive Learning</p>
-                  </div>
-                </Link>
-                <div className="h-8 w-px bg-[#D5DEEF] hidden sm:block" />
-                <span className="hidden sm:block text-sm font-bold text-[#628ECB] uppercase tracking-widest">{title}</span>
-              </div>
-              <Link
-                to={backPath}
-                className="flex items-center gap-2 text-[#395886] hover:text-[#628ECB] transition-colors text-sm font-semibold"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Kembali</span>
+      <header className="sticky top-0 z-50 w-full border-b border-[#C8D8F0] bg-white/95 shadow-md backdrop-blur-md transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex min-h-[76px] items-center justify-between gap-6">
+            <div className="flex min-w-0 items-center gap-4">
+              <Link to={backPath} className="flex items-center gap-3">
+                <div className="hidden sm:block min-w-0">
+                  <Logo />
+                </div>
+                <div className="sm:hidden">
+                  <Logo size="sm" />
+                </div>
               </Link>
+              <div className="h-8 w-px bg-[#D5DEEF] hidden sm:block" />
+              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-[#628ECB]/10 px-3 py-1 text-xs font-bold text-[#628ECB] uppercase tracking-widest border border-[#628ECB]/20">
+                {title}
+              </span>
             </div>
+            <Link
+              to={backPath}
+              className="flex items-center gap-2 text-[#395886] hover:text-[#628ECB] transition-colors text-sm font-bold"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Kembali</span>
+            </Link>
           </div>
-        </header>
+        </div>
+      </header>
 
         <div className="max-w-7xl mx-auto lg:flex lg:items-start lg:gap-6 px-4 sm:px-6 lg:px-8 py-6">
           {hasSidebar && (
@@ -444,12 +491,11 @@ export function TestPage({
           <div className="flex min-h-[76px] items-center justify-between gap-6">
             <div className="flex min-w-0 items-center gap-4">
               <Link to={backPath} className="flex items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#628ECB] shadow-sm">
-                  <BookOpen className="h-6 w-6 text-white" />
-                </div>
                 <div className="hidden sm:block min-w-0">
-                  <p className="truncate text-lg font-bold text-[#395886]">CONNETIC Module</p>
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#628ECB]">Interactive Learning</p>
+                  <Logo />
+                </div>
+                <div className="sm:hidden">
+                  <Logo size="sm" />
                 </div>
               </Link>
               <div className="h-8 w-px bg-[#D5DEEF] hidden sm:block" />
@@ -460,10 +506,10 @@ export function TestPage({
                 <div
                   className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold border ${
                     timeRemaining <= 60
-                      ? 'bg-red-50 text-red-600 border-red-200'
+                      ? 'bg-red-50 text-red-600 border-red-200 animate-pulse'
                       : timeRemaining <= 180
-                      ? 'bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/30'
-                      : 'bg-[#628ECB]/10 text-[#628ECB] border-[#628ECB]/20'
+                      ? 'bg-orange-50 text-orange-600 border-orange-200'
+                      : 'bg-orange-50 text-orange-500 border-orange-200'
                   }`}
                 >
                   <Clock className="h-3.5 w-3.5" />
@@ -582,6 +628,30 @@ export function TestPage({
           </div>
         </main>
       </div>
+
+      <AlertDialog open={showConfirmSubmit} onOpenChange={(open) => !open && handleCancelSubmit()}>
+        <AlertDialogContent className="rounded-[2rem] border-[#D5DEEF] shadow-2xl">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#628ECB]/10 text-[#628ECB]">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <AlertDialogTitle className="text-[#395886] text-xl font-black">Konfirmasi Selesai</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-[#395886]/65 font-medium text-base leading-relaxed">
+              Apakah Anda yakin sudah selesai mengerjakan? Jawaban tidak dapat diubah setelah dikumpulkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3 mt-2">
+            <AlertDialogCancel onClick={handleCancelSubmit} className="border-[#D5DEEF] text-[#395886] hover:bg-[#F0F3FA] rounded-xl font-bold px-6">
+              Tidak, Kembali
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSubmit} className="bg-gradient-to-r from-[#395886] to-[#628ECB] text-white hover:from-[#2E4A75] hover:to-[#4A79BA] rounded-xl font-bold px-6 shadow-lg shadow-[#628ECB]/20">
+              Ya, Kumpulkan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

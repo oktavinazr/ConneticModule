@@ -1,43 +1,48 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { getCurrentUser } from '../utils/auth';
-import { getLessonProgress, savePosttestResult } from '../utils/progress';
-import { lessons } from '../data/lessons';
+import { getLessonProgress, savePosttestResult, LessonProgress } from '../utils/progress';
+import { lessons, type TestQuestion } from '../data/lessons';
+import { loadTestQuestions } from '../utils/adminData';
 import { TestPage } from '../components/TestPage';
 
 export function EvaluationPage() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const [user] = useState(getCurrentUser);
   const lesson = lessonId ? lessons[lessonId] : null;
 
-  const [progress, setProgress] = useState(() =>
-    getLessonProgress(user!.id, lessonId!)
-  );
+  const [progress, setProgress] = useState<LessonProgress>({
+    lessonId: lessonId ?? '',
+    userId: user?.id ?? '',
+    pretestCompleted: false,
+    completedStages: [],
+    posttestCompleted: false,
+    answers: {},
+    stageAttempts: {},
+    stageSuccess: {},
+  });
+
+  const [questions, setQuestions] = useState<TestQuestion[]>(lesson?.posttest.questions ?? []);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    if (!lesson) {
-      navigate('/dashboard');
-      return;
-    }
-
-    // Cek apakah semua tahap sudah selesai
-    if (progress.completedStages.length < lesson.stages.length) {
-      navigate(`/lesson/${lessonId}`);
-    }
-  }, [user, lesson, progress, lessonId, navigate]);
+    if (!user) { navigate('/login'); return; }
+    if (!lesson) { navigate('/dashboard'); return; }
+    getLessonProgress(user.id, lessonId!).then((p) => {
+      if (p.completedStages.length < lesson.stages.length) {
+        navigate(`/lesson/${lessonId}`);
+        return;
+      }
+      setProgress(p);
+    });
+    loadTestQuestions(`lesson_${lessonId}_posttest`).then(setQuestions);
+  }, [user, lesson, lessonId, navigate]);
 
   if (!lesson) return null;
 
-  const handleComplete = (score: number, answers: number[]) => {
-    savePosttestResult(user!.id, lessonId!, score, answers);
-    setProgress(getLessonProgress(user!.id, lessonId!));
-    // Jangan otomatis arahkan ulang, biarkan pengguna meninjau
+  const handleComplete = async (score: number, answers: number[]) => {
+    await savePosttestResult(user!.id, lessonId!, score, answers);
+    getLessonProgress(user!.id, lessonId!).then(setProgress);
   };
 
   const existingAnswers = progress.posttestCompleted
@@ -48,10 +53,9 @@ export function EvaluationPage() {
     <TestPage
       title={`Post-Test ${lesson.title}`}
       description={`Evaluasi akhir untuk ${lesson.topic}`}
-      questions={lesson.posttest.questions}
+      questions={questions}
       onComplete={handleComplete}
       backPath="/dashboard"
-      reflectionPath={`/reflection/${lessonId}`}
       showResults={progress.posttestCompleted}
       existingAnswers={existingAnswers}
       existingScore={progress.posttestScore}

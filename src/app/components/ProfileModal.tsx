@@ -34,7 +34,7 @@ export function ProfileModal({ isOpen, onClose, user, onUpdate }: ProfileModalPr
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setError('');
 
     if (!editedData.email.includes('@')) {
@@ -47,7 +47,7 @@ export function ProfileModal({ isOpen, onClose, user, onUpdate }: ProfileModalPr
       return;
     }
 
-    const success = updateUser(user.id, editedData);
+    const success = await updateUser(user.id, editedData);
     if (success) {
       setIsEditing(false);
       onUpdate();

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { ArrowRight, BookOpen, CheckCircle, Home, ShieldCheck, UserPlus } from 'lucide-react';
+import { ArrowRight, CheckCircle, Home, ShieldCheck, UserPlus } from 'lucide-react';
 import { register } from '../utils/auth';
+import { Logo } from '../components/layout/Logo';
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ export function RegisterPage() {
     }
   }, [success, navigate]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -65,13 +66,16 @@ export function RegisterPage() {
       return;
     }
 
-    const result = register(name, username, email, password, gender, classRoom, nis);
-    if (!result) {
-      setError('Username, email, atau NIS sudah terdaftar.');
-      return;
+    try {
+      const result = await register(name, username, email, password, gender, classRoom, nis);
+      if (!result) {
+        setError('Username, email, atau NIS sudah terdaftar.');
+        return;
+      }
+      setSuccess(true);
+    } catch (err) {
+      setError('Gagal mendaftar: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
-
-    setSuccess(true);
   };
 
   return (
@@ -79,16 +83,10 @@ export function RegisterPage() {
       <header className="mx-auto flex w-full max-w-[1280px] items-center justify-between rounded-2xl border border-white/70 bg-white/85 px-4 py-3 shadow-[0_18px_55px_rgba(57,88,134,0.08)] backdrop-blur sm:px-6">
         <div className="flex items-center">
           <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#628ECB] shadow-md">
-              <BookOpen className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-[#395886]">CONNETIC Module</p>
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#628ECB]">Interactive Learning</p>
-            </div>
+            <Logo />
           </Link>
           <div className="mx-4 hidden h-8 w-px bg-[#D5DEEF] sm:block" />
-          <span className="hidden text-sm font-bold uppercase tracking-widest text-[#628ECB] sm:block">Register</span>
+          <span className="hidden sm:inline-flex items-center rounded-lg bg-[#628ECB]/10 px-3 py-1 text-xs font-bold text-[#628ECB] uppercase tracking-widest border border-[#628ECB]/20">Register</span>
         </div>
         <Link
           to="/"
@@ -100,28 +98,28 @@ export function RegisterPage() {
       </header>
 
       <main className="mx-auto flex min-h-[calc(100vh-7.5rem)] max-w-[1280px] items-center py-6">
-        <div className="grid w-full overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-[0_30px_80px_rgba(57,88,134,0.14)] backdrop-blur lg:grid-cols-[0.92fr_1.08fr]">
+        <div className="grid w-full overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-[0_30px_80px_rgba(57,88,134,0.14)] backdrop-blur lg:grid-cols-[0.8fr_1.2fr]">
           <section className="relative overflow-hidden bg-[linear-gradient(165deg,#395886_0%,#4e79b0_46%,#7fb3ea_100%)] px-6 py-8 text-white sm:px-8 lg:px-10">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.24),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(255,255,255,0.12),_transparent_35%)]" />
-            <div className="relative flex h-full flex-col justify-between gap-6">
-              <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold">
-                  <UserPlus className="h-5 w-5" />
-                  Registrasi Siswa
+            <div className="relative flex h-full flex-col justify-center py-10 lg:py-12 gap-7">
+              <div className="space-y-5">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold w-fit">
+                  <UserPlus className="h-4 w-4" />
+                  Pendaftaran Siswa
                 </div>
-                <h1 className="max-w-md text-3xl font-bold leading-tight sm:text-4xl">
-                  Buat akun siswa dan lanjutkan ke halaman login.
+                <h1 className="max-w-md text-3xl font-bold leading-tight sm:text-4xl tracking-tight">
+                  Buat Akun untuk Memulai Belajar
                 </h1>
-                <p className="max-w-lg text-sm leading-7 text-white/80 sm:text-base">
-                  Pendaftaran hanya untuk siswa. Admin tidak melalui proses registrasi dan menggunakan akun khusus yang sudah tersedia.
+                <p className="max-w-lg text-sm leading-relaxed text-white/80 sm:text-base">
+                  Lengkapi formulir pendaftaran dengan data diri yang valid agar Anda dapat mengakses seluruh materi pembelajaran dan memantau progres belajar Anda.
                 </p>
               </div>
 
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-                  <ShieldCheck className="mb-3 h-8 w-8 text-[#D5DEEF]" />
-                  <p className="mb-1 text-sm font-semibold">Data lebih lengkap</p>
-                  <p className="text-sm text-white/75">Form kini mencakup username dan jenis kelamin untuk identitas siswa.</p>
+              <div className="space-y-4">
+                <div className="rounded-[1.5rem] border border-white/15 bg-white/10 p-5 backdrop-blur-sm shadow-sm transition-all hover:bg-white/15">
+                  <ShieldCheck className="mb-3 h-7 w-7 text-[#D5DEEF]" />
+                  <p className="mb-1 text-sm font-semibold">Data Valid & Akurat</p>
+                  <p className="text-xs text-white/75 leading-relaxed">Pastikan Nama, NIS, dan Kelas sesuai dengan data sekolah Anda untuk sinkronisasi nilai yang tepat.</p>
                 </div>
               </div>
             </div>
@@ -288,7 +286,7 @@ export function RegisterPage() {
                 </button>
               </form>
 
-              <p className="mt-6 text-sm text-[#395886]/75">
+              <p className="mt-6 text-center text-sm text-[#395886]/75">
                 Sudah punya akun?{' '}
                 <Link to="/login" className="font-semibold text-[#628ECB] hover:text-[#395886]">
                   Login di sini

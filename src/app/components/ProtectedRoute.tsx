@@ -14,7 +14,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
   const currentUser = getCurrentUser();
   if (requiredRole && currentUser?.role !== requiredRole) {
-    return <Navigate to={currentUser?.role === 'admin' ? '/admin' : '/dashboard'} replace />;
+    return <Navigate to={currentUser?.role === 'admin' ? '/teacher' : '/dashboard'} replace />;
   }
 
   return <>{children}</>;

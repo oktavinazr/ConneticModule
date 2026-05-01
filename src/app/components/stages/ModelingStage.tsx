@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, CheckCircle, MonitorPlay, User, Info, ArrowRight, AlertCircle, RotateCcw } from 'lucide-react';
 import { getCurrentUser } from '../../utils/auth';
 import { getLessonProgress, saveStageAttempt } from '../../utils/progress';
@@ -20,12 +20,16 @@ interface ModelingStageProps {
 
 export function ModelingStage({ modelingSteps, lessonId, stageIndex, onComplete }: ModelingStageProps) {
   const user = getCurrentUser();
-  const initialProgress = getLessonProgress(user!.id, lessonId);
-
   const [currentIdx, setCurrentIdx] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [practiceDone, setPracticeDone] = useState<Record<string, boolean>>({});
-  const [attempts, setAttempts] = useState(initialProgress.stageAttempts[`stage_${stageIndex}`] || 0);
+  const [attempts, setAttempts] = useState(0);
+
+  useEffect(() => {
+    getLessonProgress(user!.id, lessonId).then((p) => {
+      setAttempts(p.stageAttempts[`stage_${stageIndex}`] || 0);
+    });
+  }, []);
 
   const steps = modelingSteps ?? [];
   const currentStep = steps[currentIdx];
@@ -44,9 +48,8 @@ export function ModelingStage({ modelingSteps, lessonId, stageIndex, onComplete 
     if (currentIdx > 0) setCurrentIdx(currentIdx - 1);
   };
 
-  const handlePracticeAction = () => {
-    // Untuk pemodelan, tindakan apapun dihitung sebagai keberhasilan untuk pelacakan
-    saveStageAttempt(user!.id, lessonId, stageIndex, true);
+  const handlePracticeAction = async () => {
+    await saveStageAttempt(user!.id, lessonId, stageIndex, true);
     setPracticeDone(prev => ({ ...prev, [currentStep.id]: true }));
   };
 

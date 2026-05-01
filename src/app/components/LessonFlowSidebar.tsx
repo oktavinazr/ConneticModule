@@ -84,7 +84,8 @@ export function LessonFlowSidebar({
                   {lesson.stages.map((stage, index) => {
                     const stageCompleted = progress.completedStages.includes(index);
                     const isCurrent = currentStep === 3 && index === currentStageIndex;
-                    const stageClickable = fullyCompleted && onStageClick;
+                    // Dapat diklik jika: pelajaran sudah selesai penuh, ATAU tahap ini sudah pernah diselesaikan, ATAU ini adalah tahap yang sedang aktif (tapi disabled agar tidak re-click)
+                    const stageClickable = (fullyCompleted || stageCompleted) && !isCurrent && onStageClick;
                     return (
                       <button
                         key={index}
