@@ -72,36 +72,40 @@ export function getStageAnswerSummary(stage: Stage, answer: any): string {
       case 'constructivism': {
         const a = answer as { selectedOption?: string };
         const opt = stage.options?.find((o: any) => o.id === a.selectedOption);
-        return opt ? `Pilihan: "${opt.text.slice(0, 40)}..."` : '—';
+        return opt ? `Pilihan: "${opt.text.slice(0, 40)}..."` : 'Selesai';
       }
       case 'inquiry': {
+        if (answer.type === 'lesson1_format') {
+          return 'Selesai (2 Refleksi)';
+        }
         const matched = Object.keys(answer as Record<string, string>).length;
-        const total = stage.groupItems?.length ?? 0;
-        return `${matched}/${total} pasangan cocok`;
+        return `${matched} item selesai`;
       }
       case 'questioning': {
-        const a = answer as { selectedAnswer?: number; isCorrect?: boolean };
+        const a = answer as { selectedAnswer?: number; isCorrect?: boolean; selectedId?: string };
         const correct = a.isCorrect ? 'Benar' : 'Salah';
+        if (a.selectedId === 'pizza_simulation') return `${correct}: Simulasi Pizza`;
         const opt = stage.options?.[a.selectedAnswer ?? -1];
         return opt ? `${correct}: "${String(opt).slice(0, 35)}..."` : `${correct}`;
       }
       case 'learning-community': {
-        const a = answer as { stance?: string };
-        const opt = stage.options?.find((o: any) => o.id === a.stance);
-        return opt ? `Sikap: ${opt.text}` : '—';
+        const a = answer as any;
+        if (a?.encapsulation && a?.decapsulation) {
+          return `Selesai: Encap (${a.encapsulation.choice}) & Decap (${a.decapsulation.choice})`;
+        }
+        return 'Selesai';
       }
       case 'modeling':
-        return Array.isArray(answer) ? `${answer.length} item diurutkan` : '—';
+        return 'Selesai';
       case 'reflection': {
-        const a = answer as { reflections?: Record<string, string> };
-        const reflCount = Object.values(a.reflections ?? {}).filter((r) => r.trim().length > 0).length;
-        return `${reflCount} refleksi diisi`;
+        const a = answer as any;
+        const essayCount = Object.values(a.essays ?? {}).filter((v: any) => v.length > 0).length;
+        return `${essayCount} esai selesai`;
       }
       case 'authentic-assessment': {
-        const a = answer as { essay?: string; selectedAnswer?: number };
-        if (a.essay) return `Esai: "${a.essay.slice(0, 40)}..."`;
-        if (a.selectedAnswer !== undefined) return `Opsi ke-${a.selectedAnswer + 1}`;
-        return '—';
+        const a = answer as any;
+        if (a.initialChoice) return `Selesai: ${a.initialChoice}`;
+        return 'Selesai';
       }
       default:
         return '—';
@@ -124,14 +128,30 @@ export function StageAnswerDetail({ stage, answer }: { stage: Stage; answer: any
               <span className="text-xs font-bold text-[#395886]/50 uppercase">Pilihan:</span>
               <p className="text-[#395886] mt-0.5">{opt?.text ?? a.selectedOption ?? '—'}</p>
             </div>
-            <div>
-              <span className="text-xs font-bold text-[#395886]/50 uppercase">Alasan:</span>
-              <p className="text-[#395886] mt-0.5 bg-[#F0F3FA] rounded-lg px-3 py-2 text-sm leading-relaxed">{a.reason ?? '—'}</p>
-            </div>
+            {a.reason && (
+              <div>
+                <span className="text-xs font-bold text-[#395886]/50 uppercase">Alasan:</span>
+                <p className="text-[#395886] mt-0.5 bg-[#F0F3FA] rounded-lg px-3 py-2 text-sm leading-relaxed">{a.reason}</p>
+              </div>
+            )}
           </div>
         );
       }
       case 'inquiry': {
+        if (answer.type === 'lesson1_format') {
+          return (
+            <div className="space-y-3 text-sm">
+               <div className="bg-[#F0F3FA] rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">Refleksi Layer Sorting</p>
+                  <p className="text-[#395886] italic">"{answer.reflection1}"</p>
+               </div>
+               <div className="bg-[#F0F3FA] rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">Refleksi Fungsi Layer</p>
+                  <p className="text-[#395886] italic">"{answer.reflection2}"</p>
+               </div>
+            </div>
+          );
+        }
         const pairs = answer as Record<string, string>;
         return (
           <div className="space-y-1.5">
@@ -146,125 +166,130 @@ export function StageAnswerDetail({ stage, answer }: { stage: Stage; answer: any
         );
       }
       case 'questioning': {
-        const a = answer as { selectedAnswer?: number; isCorrect?: boolean };
+        const a = answer as { selectedAnswer?: number; isCorrect?: boolean; justification?: string; selectedId?: string };
         const opt = stage.options?.[a.selectedAnswer ?? -1];
         return (
-          <div className="flex items-center gap-2 text-sm">
-            {a.isCorrect ? <CheckCircle className="w-4 h-4 text-[#10B981] shrink-0" /> : <XCircle className="w-4 h-4 text-red-500 shrink-0" />}
-            <span className={a.isCorrect ? 'text-[#10B981]' : 'text-red-600'}>
-              {a.isCorrect ? 'Benar' : 'Salah'} — {opt ? String(opt) : `Opsi ${(a.selectedAnswer ?? 0) + 1}`}
-            </span>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center gap-2">
+              {a.isCorrect ? <CheckCircle className="w-4 h-4 text-[#10B981] shrink-0" /> : <XCircle className="w-4 h-4 text-red-500 shrink-0" />}
+              <span className={a.isCorrect ? 'text-[#10B981]' : 'text-red-600'}>
+                {a.isCorrect ? 'Berhasil' : 'Perlu Tinjauan'} — {a.selectedId === 'pizza_simulation' ? 'Simulasi Pizza' : (opt ? String(opt) : `Opsi ${(a.selectedAnswer ?? 0) + 1}`)}
+              </span>
+            </div>
+            {a.justification && (
+              <div className="bg-[#F0F3FA] rounded-lg p-3">
+                <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">Argumentasi Logis</p>
+                <p className="text-[#395886] italic">"{a.justification}"</p>
+              </div>
+            )}
           </div>
         );
       }
       case 'learning-community': {
         const a = answer as any;
-        // New lesson 1 format with encapsulation/decapsulation
-        if (a?.encapsulation !== undefined || a?.decapsulation !== undefined || a?.simulationViewed !== undefined) {
+        if (a?.encapsulation !== undefined && a?.decapsulation !== undefined) {
           return (
             <div className="space-y-3 text-sm">
-              {a.simulationViewed && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[#10B981]/8 border border-[#10B981]/20">
-                  <CheckCircle className="w-4 h-4 text-[#10B981] shrink-0" />
-                  <span className="text-xs font-bold text-[#10B981]">Visualisasi TCP/IP telah disimak</span>
-                </div>
-              )}
-              {a.encapsulation && (
-                <div className="bg-[#F0F3FA] rounded-lg p-3">
-                  <p className="text-xs font-bold text-[#395886]/50 mb-1 uppercase">X.TCP.6 — Encapsulation</p>
-                  <p className="text-[#395886]">
-                    {a.encapsulation.correct ? '✓ Urutan encapsulation benar' : 'Urutan perlu ditinjau'}
-                    {a.encapsulation.groupSeen ? ' · Jawaban kelompok telah dibandingkan' : ''}
-                  </p>
-                </div>
-              )}
-              {a.decapsulation && (
-                <div className="bg-[#F0F3FA] rounded-lg p-3">
-                  <p className="text-xs font-bold text-[#395886]/50 mb-1 uppercase">X.TCP.7 — Decapsulation</p>
-                  <p className="text-[#395886]">
-                    {a.decapsulation.correct ? '✓ Urutan decapsulation benar' : 'Urutan perlu ditinjau'}
-                    {a.decapsulation.analysesSeen ? ' · Analisis teman telah divalidasi' : ''}
-                  </p>
+              <div className="bg-[#F0F3FA] rounded-lg p-3">
+                <p className="text-xs font-bold text-[#395886]/50 mb-1 uppercase">X.TCP.6 — Encapsulation</p>
+                <p className="text-[#395886] font-bold">Pilihan: {a.encapsulation.choice}</p>
+                <p className="text-[#395886] mt-1 italic leading-relaxed text-xs">"{a.encapsulation.arg}"</p>
+              </div>
+              <div className="bg-[#F0F3FA] rounded-lg p-3">
+                <p className="text-xs font-bold text-[#395886]/50 mb-1 uppercase">X.TCP.7 — Decapsulation</p>
+                <p className="text-[#395886] font-bold">Pilihan: {a.decapsulation.choice}</p>
+                <p className="text-[#395886] mt-1 italic leading-relaxed text-xs">"{a.decapsulation.arg}"</p>
+              </div>
+              {a.ranking && (
+                <div className="bg-[#F59E0B]/5 border border-[#F59E0B]/20 rounded-lg p-3">
+                   <p className="text-xs font-bold text-[#F59E0B] mb-1 uppercase">Hasil Voting Kelompok</p>
+                   <div className="space-y-1">
+                      {a.ranking.map((r: any, idx: number) => (
+                        <p key={idx} className="text-[10px] font-medium text-[#395886]">
+                          {idx + 1}. {r.name} ({r.voteCount} vote)
+                        </p>
+                      ))}
+                   </div>
                 </div>
               )}
             </div>
           );
         }
-        // Legacy format
-        const opt = stage.options?.find((o: any) => o.id === a.stance);
-        return (
-          <div className="space-y-2 text-sm">
-            <div>
-              <span className="text-xs font-bold text-[#395886]/50 uppercase">Sikap:</span>
-              <p className="text-[#395886] mt-0.5 font-medium">{opt?.text ?? a.stance ?? '—'}</p>
-            </div>
-            <div>
-              <span className="text-xs font-bold text-[#395886]/50 uppercase">Alasan:</span>
-              <p className="text-[#395886] mt-0.5 bg-[#F0F3FA] rounded-lg px-3 py-2 leading-relaxed">{a.reason ?? '—'}</p>
-            </div>
-          </div>
-        );
+        return <p className="text-xs text-[#395886]/50 italic">Selesai Berkolaborasi</p>;
       }
       case 'modeling': {
-        const ids = answer as string[];
         return (
-          <div className="space-y-1.5">
-            {ids.map((id, i) => {
-              const item = stage.items?.find((it: any) => it.id === id);
-              return (
-                <div key={i} className="flex items-center gap-2 text-xs">
-                  <span className="w-5 h-5 rounded-full bg-[#628ECB]/10 text-[#628ECB] flex items-center justify-center font-bold shrink-0">{i + 1}</span>
-                  <span className="text-[#395886]">{item?.text ?? id}</span>
-                </div>
-              );
-            })}
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
+             <CheckCircle className="w-4 h-4 text-green-600" />
+             <span className="text-xs font-bold text-green-700">Simulasi langkah-demi-langkah selesai disimak & dipraktikkan.</span>
           </div>
         );
       }
       case 'reflection': {
-        const a = answer as { selectedAnswer?: number; reflections?: Record<string, string> };
-        const opt = stage.options?.[a.selectedAnswer ?? -1];
-        const prompts = stage.reflectionPrompts ?? ['Konsep penting?', 'Penerapan nyata?', 'Yang masih membingungkan?'];
+        const a = answer as any;
+        const essayReflection = stage.essayReflection ?? {
+          materialSummaryPrompt: 'Ringkasan Materi',
+          easyPartPrompt: 'Bagian Termudah',
+          hardPartPrompt: 'Bagian Tersulit',
+        };
+        const criteria = stage.selfEvaluationCriteria ?? [];
+
         return (
-          <div className="space-y-3 text-sm">
-            <div className="space-y-2">
-              {prompts.map((prompt, i) => {
-                const val = a.reflections?.[`prompt_${i}`] ?? '';
-                return (
-                  <div key={i} className="bg-[#F0F3FA] rounded-lg p-3">
-                    <p className="text-xs font-bold text-[#395886]/50 mb-1">{prompt}</p>
-                    <p className="text-[#395886] leading-relaxed">{val || <span className="italic text-[#395886]/40">Belum diisi</span>}</p>
+          <div className="space-y-4 text-sm">
+            <div className="space-y-3">
+               <div className="bg-[#F0F3FA] rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">{essayReflection.materialSummaryPrompt}</p>
+                  <p className="text-[#395886] leading-relaxed italic">"{a.essays?.summary || '—'}"</p>
+               </div>
+               <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-green-50/50 border border-green-100 rounded-lg p-3">
+                     <p className="text-[10px] font-bold text-green-600/60 mb-1 uppercase">{essayReflection.easyPartPrompt}</p>
+                     <p className="text-[#395886] leading-relaxed text-xs italic">"{a.essays?.easy || '—'}"</p>
                   </div>
-                );
-              })}
+                  <div className="bg-red-50/50 border border-red-100 rounded-lg p-3">
+                     <p className="text-[10px] font-bold text-red-600/60 mb-1 uppercase">{essayReflection.hardPartPrompt}</p>
+                     <p className="text-[#395886] leading-relaxed text-xs italic">"{a.essays?.hard || '—'}"</p>
+                  </div>
+               </div>
             </div>
-            {opt && (
-              <div>
-                <span className="text-xs font-bold text-[#395886]/50 uppercase">Kesimpulan:</span>
-                <p className="text-[#395886] mt-0.5 font-medium">{String(opt)}</p>
+
+            {criteria.length > 0 && (
+              <div className="bg-white border border-[#D5DEEF] rounded-xl overflow-hidden">
+                 <div className="bg-gray-50 px-3 py-2 border-b border-[#D5DEEF]">
+                    <p className="text-[10px] font-black uppercase text-[#395886]/60">Penilaian Diri (Skala 1-4)</p>
+                 </div>
+                 <div className="divide-y divide-[#D5DEEF]">
+                    {criteria.map(c => (
+                      <div key={c.id} className="px-3 py-2 flex items-center justify-between gap-4">
+                         <span className="text-[11px] font-medium text-[#395886]">{c.label}</span>
+                         <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg font-black text-xs ${
+                           (a.selfEvaluation?.[c.id] || 0) >= 3 ? 'bg-green-500 text-white' : 'bg-amber-500 text-white'
+                         }`}>
+                            {a.selfEvaluation?.[c.id] || '—'}
+                         </span>
+                      </div>
+                    ))}
+                 </div>
               </div>
             )}
           </div>
         );
       }
       case 'authentic-assessment': {
-        const a = answer as { essay?: string; selectedAnswer?: number; isCorrect?: boolean };
+        const a = answer as any;
         return (
-          <div className="space-y-2 text-sm">
-            {a.selectedAnswer !== undefined && (
-              <div className="flex items-center gap-2">
-                {a.isCorrect ? <CheckCircle className="w-4 h-4 text-[#10B981] shrink-0" /> : <XCircle className="w-4 h-4 text-red-500 shrink-0" />}
-                <span className={a.isCorrect ? 'text-[#10B981]' : 'text-red-600'}>
-                  {a.isCorrect ? 'Solusi Tepat' : 'Pertimbangkan kembali'} —{' '}
-                  {stage.options?.[a.selectedAnswer] ? String(stage.options[a.selectedAnswer]) : `Opsi ${a.selectedAnswer + 1}`}
-                </span>
-              </div>
-            )}
-            {a.essay && (
-              <div>
-                <span className="text-xs font-bold text-[#395886]/50 uppercase">Jawaban Esai:</span>
-                <p className="text-[#395886] mt-0.5 bg-[#F0F3FA] rounded-lg px-3 py-2 leading-relaxed">{a.essay}</p>
-              </div>
+          <div className="space-y-3 text-sm">
+            <div className="bg-[#F0F3FA] rounded-lg p-3 border border-[#D5DEEF]">
+              <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">Keputusan Diagnosis Awal</p>
+              <p className="text-[#395886] font-bold">{a.initialChoice || '—'}</p>
+              <p className="text-[#395886] mt-1 italic text-xs leading-relaxed">"{a.initialReason || '—'}"</p>
+            </div>
+            {a.followUpChoice && (
+               <div className="bg-[#F0F3FA] rounded-lg p-3 border border-[#D5DEEF]">
+                  <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">Prioritas Tindak Lanjut</p>
+                  <p className="text-[#395886] font-bold">{a.followUpChoice}</p>
+                  <p className="text-[#395886] mt-1 italic text-xs leading-relaxed">"{a.followUpReason}"</p>
+               </div>
             )}
           </div>
         );

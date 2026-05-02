@@ -156,10 +156,12 @@ export interface StageOverride {
   // Learning Community
   matchingPairs?: Array<{ left: string; right: string }>;
   caseScenario?: {
+    id?: string;
     title: string;
-    description: string;
+    description?: string;
+    scenario?: string;
     question: string;
-    options: Array<{ id: string; text: string; isCorrect: boolean; feedback: string }>;
+    options: Array<{ id: string; text: string; description?: string; isCorrect?: boolean; feedback?: string }>;
   };
 
   // Modeling
@@ -174,7 +176,20 @@ export interface StageOverride {
   branchingScenario?: {
     context: string;
     initialQuestion: string;
-    choices: Array<{ id: string; text: string; isOptimal: boolean; consequence: string }>;
+    focusAreas?: string[];
+    choices: Array<{
+      id: string;
+      text: string;
+      isOptimal: boolean;
+      consequence: string;
+      followUpQuestion?: string;
+      followUpChoices?: Array<{
+        id: string;
+        text: string;
+        isCorrect: boolean;
+        explanation: string;
+      }>;
+    }>;
     finalEvaluation: string;
   };
 }

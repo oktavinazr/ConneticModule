@@ -380,6 +380,7 @@ export function LessonPage() {
         return (
           <InquiryStage
             {...commonProps}
+            material={currentStage.material}
             explorationSections={currentStage.explorationSections}
             groups={currentStage.groups}
             groupItems={currentStage.groupItems}
@@ -417,6 +418,9 @@ export function LessonPage() {
             peerComments={currentStage.peerComments}
             caseComparisonData={currentStage.caseComparisonData}
             encapsulationCaseData={currentStage.encapsulationCaseData}
+            encapsulationCase={currentStage.encapsulationCase}
+            decapsulationCase={currentStage.decapsulationCase}
+            groupActivity={currentStage.groupActivity}
           />
         );
       case 'modeling': {
@@ -429,7 +433,13 @@ export function LessonPage() {
             content: step.description,
           }));
 
-        return <ModelingStage {...commonProps} modelingSteps={modelingStepsData} />;
+        return (
+          <ModelingStage 
+            {...commonProps} 
+            modelingSteps={modelingStepsData} 
+            practiceInstructions={currentStage.practiceInstructions}
+          />
+        );
       }
       case 'reflection':
         return (

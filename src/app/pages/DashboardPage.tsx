@@ -97,7 +97,7 @@ export function DashboardPage() {
   const availableGroups = useMemo(() => {
     const firstLesson = Object.values(lessons)[0];
     const learningCommunityStage = firstLesson?.stages.find((stage) => stage.type === 'learning-community');
-    return learningCommunityStage?.groupActivity?.groupNames ?? ['Kelompok 1', 'Kelompok 2', 'Kelompok 3', 'Kelompok 4', 'Kelompok 5'];
+    return learningCommunityStage?.groupActivity?.groupNames ?? ['Kelompok 1', 'Kelompok 2', 'Kelompok 3', 'Kelompok 4', 'Kelompok 5', 'Kelompok 6', 'Kelompok 7', 'Kelompok 8'];
   }, []);
 
   const groupAssignments = useMemo(() => {
@@ -124,6 +124,14 @@ export function DashboardPage() {
 
   const saveGroupSelection = (groupName: string) => {
     if (!user) return;
+
+    // Check if group is full
+    const studentsInGroup = allStudents.filter((student) => groupAssignments[student.id] === groupName);
+    if (studentsInGroup.length >= 5 && groupAssignments[user.id] !== groupName) {
+      alert(`${groupName} sudah penuh (maksimal 5 orang). Silakan pilih kelompok lain.`);
+      return;
+    }
+
     const nextAssignments = {
       ...groupAssignments,
       [user.id]: groupName,
@@ -138,6 +146,7 @@ export function DashboardPage() {
   };
 
   const fullName = user?.name ?? '';
+  const firstName = fullName.split(' ')[0];
 
   if (!user) return null;
 
@@ -168,7 +177,7 @@ export function DashboardPage() {
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-black uppercase tracking-[0.45em] text-white/60 mb-1">Ruang Belajar Siswa</p>
                 <h1 className="text-2xl font-black text-white sm:text-3xl tracking-tight">
-                  Hai, <span className="text-white/90">{fullName}</span>!
+                  Hai, <span className="text-white/90">{firstName}</span>!
                 </h1>
                 <p className="mt-2.5 text-sm text-white/65 font-medium leading-relaxed max-w-xl">
                   Lanjutkan aktivitas belajar dan pantau progres pembelajaran Anda hari ini.
@@ -718,24 +727,36 @@ export function DashboardPage() {
               <div className="space-y-5">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#628ECB]">Tersedia</p>
                 <div className="grid gap-3">
-                  {availableGroups.map((groupName) => (
-                    <button
-                      key={groupName}
-                      onClick={() => saveGroupSelection(groupName)}
-                      className={`group relative overflow-hidden rounded-2xl border-2 px-5 py-4 text-left transition-all ${
-                        selectedGroup === groupName
-                          ? 'border-[#628ECB] bg-[#628ECB]/5 text-[#395886]'
-                          : 'border-[#D5DEEF] bg-white text-[#395886]/60 hover:border-[#628ECB]/50 hover:bg-[#F8FAFD]'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold">{groupName}</span>
-                        {selectedGroup === groupName && (
-                          <div className="h-2.5 w-2.5 rounded-full bg-[#628ECB] shadow-[0_0_10px_rgba(98,142,203,0.5)]" />
-                        )}
-                      </div>
-                    </button>
-                  ))}
+                  {availableGroups.map((groupName) => {
+                    const count = allStudents.filter(s => groupAssignments[s.id] === groupName).length;
+                    const isFull = count >= 5 && selectedGroup !== groupName;
+                    return (
+                      <button
+                        key={groupName}
+                        disabled={isFull}
+                        onClick={() => saveGroupSelection(groupName)}
+                        className={`group relative overflow-hidden rounded-2xl border-2 px-5 py-4 text-left transition-all ${
+                          selectedGroup === groupName
+                            ? 'border-[#628ECB] bg-[#628ECB]/5 text-[#395886]'
+                            : isFull
+                            ? 'border-[#D5DEEF] bg-[#F8FAFD] text-[#395886]/20 cursor-not-allowed opacity-60'
+                            : 'border-[#D5DEEF] bg-white text-[#395886]/60 hover:border-[#628ECB]/50 hover:bg-[#F8FAFD]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-col">
+                            <span className="font-bold">{groupName}</span>
+                            <span className="text-[10px] font-bold opacity-60">
+                              {count}/5 Anggota {isFull ? '(Penuh)' : ''}
+                            </span>
+                          </div>
+                          {selectedGroup === groupName && (
+                            <div className="h-2.5 w-2.5 rounded-full bg-[#628ECB] shadow-[0_0_10px_rgba(98,142,203,0.5)]" />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

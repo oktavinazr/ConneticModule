@@ -20,6 +20,7 @@ interface QuestioningStageProps {
   hint?: string;
   reasonOptions?: ReasonOption[];
   teacherImage?: string;
+  imageUrl?: string;
   teacherQuestion?: string;
   questionBank?: QuestionBankItem[];
   problemVisual?: ProblemVisual;
@@ -719,7 +720,7 @@ const problemTypeConfig = {
 
 function QuestioningOriginal({
   scenario, whyQuestion, hint, reasonOptions, teacherQuestion,
-  questionBank, problemVisual, lessonId, stageIndex, onComplete,
+  questionBank, problemVisual, lessonId, stageIndex, onComplete, imageUrl
 }: QuestioningStageProps) {
   const user = getCurrentUser();
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
@@ -768,6 +769,15 @@ function QuestioningOriginal({
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
+      {imageUrl && (
+        <div className="rounded-3xl border-2 border-[#D5DEEF] bg-white p-2 shadow-sm overflow-hidden group">
+           <img 
+             src={imageUrl} 
+             alt="Kasus Pertanyaan" 
+             className="w-full h-auto max-h-[400px] object-contain rounded-2xl transition-transform duration-500 group-hover:scale-[1.01]" 
+           />
+        </div>
+      )}
       {problemVisual && (() => {
         const config = problemTypeConfig[problemVisual.problemType];
         const IconComponent = config.icon;

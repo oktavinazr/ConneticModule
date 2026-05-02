@@ -657,7 +657,7 @@ export function AdminPage() {
   const availableGroups = useMemo<string[]>(() => {
     const firstLesson = Object.values(lessons)[0];
     const lcStage = firstLesson?.stages.find(s => s.type === 'learning-community');
-    return lcStage?.groupActivity?.groupNames ?? [];
+    return lcStage?.groupActivity?.groupNames ?? ['Kelompok 1', 'Kelompok 2', 'Kelompok 3', 'Kelompok 4', 'Kelompok 5', 'Kelompok 6', 'Kelompok 7', 'Kelompok 8'];
   }, []);
 
   useEffect(() => {

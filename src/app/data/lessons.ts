@@ -62,13 +62,38 @@ export interface Stage {
   // ── LEARNING COMMUNITY ──────────────────────────────────────────
   matchingPairs?: Array<{ left: string; right: string }>;
   caseScenario?: {
+    id?: string;
     title: string;
-    description: string;
+    description?: string;
+    scenario?: string;
     question: string;
-    options: Array<{ id: string; text: string; isCorrect: boolean; feedback: string }>;
+    options: Array<{ id: string; text: string; description?: string; isCorrect?: boolean; feedback?: string; logic?: string }>;
   };
   peerAnswers?: Array<{ name: string; role: string; answer: string; score?: number }>; // score for sorting
-  groupActivity?: { groupNames: string[] };          // Group names for student grouping
+  groupActivity?: { 
+    groupNames: string[];
+    discussionPrompt?: string;
+  };
+  tcpInteractiveLabels?: Array<{ layer: string; pdu: string }>;
+  layers5?: Array<{ id: string; name: string; pdu: string; color: string; desc: string }>;
+  encapsulationCase?: {
+    id: string;
+    title: string;
+    concept?: string;
+    scenario: string;
+    question: string;
+    options: Array<{ id: string; text: string; description?: string; logic?: string }>;
+    peerArguments?: Array<{ name: string; text: string; votes: number; isUser?: boolean; choiceText?: string }>;
+  };
+  decapsulationCase?: {
+    id: string;
+    title: string;
+    concept?: string;
+    scenario: string;
+    question: string;
+    options: Array<{ id: string; text: string; description?: string; logic?: string }>;
+    peerArguments?: Array<{ name: string; text: string; votes: number; isUser?: boolean; choiceText?: string }>;
+  };
 
   // ── MODELING ────────────────────────────────────────────────────
   modelingSteps?: Array<{                          // Interactive step-by-step
@@ -79,6 +104,10 @@ export interface Stage {
     interactiveAction?: string;                    // Instruction for simulation
     simulationState?: any;                         // Target state for practice
   }>;
+  practiceInstructions?: {
+    forTeacher: string[];
+    forStudent: string[];
+  };
   steps?: Array<{                                  // Step-by-step navigation
     id: string;
     title: string;
@@ -124,6 +153,11 @@ export interface Stage {
   labelingLabels?: Array<{ id: string; text: string; correctSlot: string }>;
   inquiryReflection1?: string;
   inquiryReflection2?: string;
+  material?: {
+    title: string;
+    content: string[];
+    examples?: string[];
+  };
 
   // ── QUESTIONING (extended) ──────────────────────────────────────────────
   problemVisual?: {
@@ -296,21 +330,21 @@ export const stageLearningObjectivesByLesson: Record<string, Partial<Record<Stag
     'learning-community': [
       {
         code: 'X.TCP.6',
-        description: 'Mampu memilih metode komunikasi terbaik pada skenario CSMA/CD dengan argumentasi logis',
+        description: 'Mampu menganalisis skenario pengiriman data dan memberikan argumen logis pada proses enkapsulasi',
         atpAbcd: {
           audience: 'Peserta didik',
-          behavior: 'mampu memilih metode komunikasi terbaik pada skenario CSMA/CD dengan argumentasi logis',
-          condition: 'melalui aktivitas learning community berupa peer voting dan diskusi komunitas pada media CONNETIC Module',
+          behavior: 'mampu menganalisis skenario pengiriman data dan memberikan argumen logis pada proses enkapsulasi',
+          condition: 'melalui aktivitas learning community berupa studi kasus terbuka (PC A ke PC B) pada media CONNETIC Module',
           degree: 'dengan tepat',
         },
       },
       {
         code: 'X.TCP.7',
-        description: 'Mampu membandingkan dan memvalidasi urutan proses decapsulation TCP/IP',
+        description: 'Mampu menganalisis skenario penerimaan data dan memberikan argumen logis pada proses dekapsulasi',
         atpAbcd: {
           audience: 'Peserta didik',
-          behavior: 'mampu membandingkan dan memvalidasi urutan proses decapsulation TCP/IP',
-          condition: 'melalui aktivitas learning community berupa perbandingan analisis kasus pada media CONNETIC Module',
+          behavior: 'mampu menganalisis skenario penerimaan data dan memberikan argumen logis pada proses dekapsulasi',
+          condition: 'melalui aktivitas learning community berupa diskusi kelompok dan voting argumen pada media CONNETIC Module',
           degree: 'dengan tepat',
         },
       },
@@ -499,8 +533,10 @@ export const globalPosttest = {
   ] as TestQuestion[],
 };
 
-import { createDefaultStages } from './defaultStages';
 import { lesson1Stages } from './lesson1Stages';
+import { lesson2Stages } from './lesson2Stages';
+import { lesson3Stages } from './lesson3Stages';
+import { lesson4Stages } from './lesson4Stages';
 
 export const lessons: Record<string, Lesson> = {
   '1': {
@@ -510,7 +546,7 @@ export const lessons: Record<string, Lesson> = {
     description: 'Memahami dasar-dasar Transmission Control Protocol (TCP), komponen TCP Header, dan proses encapsulation/decapsulation',
     objectives: ['X.TCP.1', 'X.TCP.2', 'X.TCP.3', 'X.TCP.4', 'X.TCP.5', 'X.TCP.6', 'X.TCP.7', 'X.TCP.8', 'X.TCP.9', 'X.TCP.10'],
     initialCompetencies: ['Dasar jaringan komputer', 'Konsep protokol komunikasi', 'Model lapisan jaringan'],
-    materials: ['Definisi & Fungsi TCP', 'Lapisan TCP/IP', 'Komponen TCP Header', 'Proses Encapsulation & Decapsulation'],
+    materials: ['Definisi & Fungsi TCP', 'Lapisan TCP/IP', 'Komponen TCP Header', 'Proses Encapsulation & Dekapsulasi'],
     pretest: {
       questions: [
         {
@@ -560,10 +596,10 @@ export const lessons: Record<string, Lesson> = {
     id: '2',
     title: 'Pertemuan 2',
     topic: 'Mekanisme TCP',
-    description: 'Mendalami mekanisme kerja TCP seperti Three-Way Handshake dan Flow Control',
-    objectives: ['X.TCP.3', 'X.TCP.4', 'X.TCP.5', 'X.TCP.8'],
-    initialCompetencies: ['Konsep dasar TCP'],
-    materials: ['Handshake', 'Flow Control'],
+    description: 'Mendalami mekanisme kerja TCP seperti Three-Way Handshake, Flow Control, dan Congestion Control',
+    objectives: ['X.TCP.4', 'X.TCP.5', 'X.TCP.8', 'X.TCP.9', 'X.TCP.10'],
+    initialCompetencies: ['Konsep dasar TCP', 'Komponen TCP Header'],
+    materials: ['Three-Way Handshake', 'Flow Control (Windowing)', 'Congestion Control'],
     pretest: {
       questions: [
         {
@@ -571,15 +607,40 @@ export const lessons: Record<string, Lesson> = {
           options: ['Two-way handshake', 'Three-way handshake', 'Four-way handshake', 'Direct connection'],
           correctAnswer: 1,
         },
+        {
+          question: 'Flag TCP mana yang digunakan untuk memulai sinkronisasi nomor urut?',
+          options: ['ACK', 'FIN', 'SYN', 'PSH'],
+          correctAnswer: 2,
+        },
+        {
+          question: 'Field Window Size digunakan untuk tujuan...',
+          options: ['Routing paket', 'Deteksi error', 'Mengatur aliran data (Flow Control)', 'Enkripsi data'],
+          correctAnswer: 2,
+        },
       ],
     },
-    stages: createDefaultStages('TCP_MECH', 'Mekanisme TCP'),
+    stages: lesson2Stages,
     posttest: {
       questions: [
         {
-          question: 'Urutan paket dalam three-way handshake adalah...',
-          options: ['SYN, SYN-ACK, ACK', 'ACK, SYN, SYN-ACK', 'SYN, ACK, SYN-ACK', 'SYN, ACK, FIN'],
+          question: 'Urutan paket yang benar dalam three-way handshake adalah...',
+          options: ['SYN, SYN-ACK, ACK', 'SYN, ACK, SYN-ACK', 'ACK, SYN, SYN-ACK', 'SYN, SYN, ACK'],
           correctAnswer: 0,
+        },
+        {
+          question: 'Apa arti dari nilai Window Size = 0 dalam paket TCP?',
+          options: [
+            'Koneksi terputus',
+            'Penerima tidak sanggup menerima data lagi sementara waktu',
+            'Pengiriman data telah selesai',
+            'Data yang dikirim rusak',
+          ],
+          correctAnswer: 1,
+        },
+        {
+          question: 'Mekanisme Slow Start digunakan dalam tahap...',
+          options: ['Error Detection', 'Congestion Control', 'Handshake', 'Decapsulation'],
+          correctAnswer: 1,
         },
       ],
     },
@@ -589,25 +650,50 @@ export const lessons: Record<string, Lesson> = {
     title: 'Pertemuan 3',
     topic: 'Internet Protocol Version 4 (IPv4)',
     description: 'Memahami struktur, kelas, dan pengalamatan IPv4',
-    objectives: ['X.IP.1', 'X.IP.3', 'X.IP.4'],
-    initialCompetencies: ['Dasar IP'],
-    materials: ['Struktur IPv4', 'Kelas IP', 'Subnet Mask'],
+    objectives: ['X.IP.1', 'X.IP.3', 'X.IP.4', 'X.IP.9', 'X.IP.10'],
+    initialCompetencies: ['Dasar IP', 'Biner Dasar'],
+    materials: ['Struktur IPv4', 'Kelas IP (A, B, C)', 'Konversi Biner-Desimal', 'Manajemen IP'],
     pretest: {
       questions: [
         {
-          question: 'Berapa jumlah bit dalam alamat IPv4?',
+          question: 'Berapa jumlah bit total dalam satu alamat IPv4?',
           options: ['16 bit', '32 bit', '64 bit', '128 bit'],
           correctAnswer: 1,
         },
+        {
+          question: 'Berapakah nilai desimal dari biner 11000000?',
+          options: ['128', '192', '168', '224'],
+          correctAnswer: 1,
+        },
+        {
+          question: 'Alamat 10.1.1.1 termasuk dalam kelas IP...',
+          options: ['Kelas A', 'Kelas B', 'Kelas C', 'Kelas D'],
+          correctAnswer: 0,
+        },
       ],
     },
-    stages: createDefaultStages('IPv4', 'Internet Protocol Version 4'),
+    stages: lesson3Stages,
     posttest: {
       questions: [
         {
-          question: 'Alamat IP 192.168.1.1 termasuk dalam kelas...',
-          options: ['Kelas A', 'Kelas B', 'Kelas C', 'Kelas D'],
+          question: 'Subnet mask standar untuk alamat IP Kelas C adalah...',
+          options: ['255.0.0.0', '255.255.0.0', '255.255.255.0', '255.255.255.255'],
           correctAnswer: 2,
+        },
+        {
+          question: 'Apa yang terjadi jika dua komputer dalam satu jaringan lokal menggunakan IP yang sama?',
+          options: [
+            'Keduanya akan saling berbagi bandwidth',
+            'Terjadi konflik IP dan koneksi menjadi tidak stabil',
+            'Router akan otomatis mengganti salah satu IP',
+            'Kecepatan internet akan meningkat dua kali lipat',
+          ],
+          correctAnswer: 1,
+        },
+        {
+          question: 'Alamat IP 172.16.0.100 termasuk dalam rentang kelas...',
+          options: ['Kelas A', 'Kelas B', 'Kelas C', 'Kelas D'],
+          correctAnswer: 1,
         },
       ],
     },
@@ -616,25 +702,45 @@ export const lessons: Record<string, Lesson> = {
     id: '4',
     title: 'Pertemuan 4',
     topic: 'Internet Protocol Version 6 (IPv6)',
-    description: 'Memahami struktur dan keunggulan IPv6',
-    objectives: ['X.IPv6.1', 'X.IPv6.3', 'X.IPv6.8'],
-    initialCompetencies: ['Dasar IPv4'],
-    materials: ['Struktur IPv6', 'Transisi'],
+    description: 'Memahami struktur, keunggulan, dan transisi IPv6',
+    objectives: ['X.IPv6.1', 'X.IPv6.3', 'X.IPv6.8', 'X.IPv6.9', 'X.IPv6.10'],
+    initialCompetencies: ['Dasar IPv4', 'Heksadesimal Dasar'],
+    materials: ['Krisis IPv4', 'Struktur 128-bit IPv6', 'Kompresi Alamat', 'Strategi Transisi'],
     pretest: {
       questions: [
         {
-          question: 'Berapa jumlah bit dalam alamat IPv6?',
+          question: 'Berapa jumlah bit total dalam satu alamat IPv6?',
           options: ['32 bit', '64 bit', '128 bit', '256 bit'],
           correctAnswer: 2,
         },
+        {
+          question: 'Sistem bilangan apa yang digunakan untuk menulis alamat IPv6?',
+          options: ['Desimal', 'Biner', 'Oktal', 'Heksadesimal'],
+          correctAnswer: 3,
+        },
+        {
+          question: 'Simbol apa yang digunakan untuk memisahkan blok pada IPv6?',
+          options: ['Titik (.)', 'Titik Dua (:)', 'Koma (,)', 'Strip (-)'],
+          correctAnswer: 1,
+        },
       ],
     },
-    stages: createDefaultStages('IPv6', 'Internet Protocol Version 6'),
+    stages: lesson4Stages,
     posttest: {
       questions: [
         {
-          question: 'Keunggulan utama IPv6 dibandingkan IPv4 adalah...',
-          options: ['Ruang alamat lebih besar', 'Kecepatan lebih tinggi', 'Biaya lebih murah', 'Kompatibilitas penuh'],
+          question: 'Manakah penulisan kompresi IPv6 yang benar untuk "2001:0db8:0000:0000:0000:0000:0000:0001"?',
+          options: ['2001:db8:1', '2001:db8::1', '2001:db8:0:1', '2001:db8::0::1'],
+          correctAnswer: 1,
+        },
+        {
+          question: 'Metode transisi yang menjalankan IPv4 dan IPv6 secara bersamaan dalam satu perangkat disebut...',
+          options: ['Tunneling', 'NAT64', 'Dual Stack', 'Translation'],
+          correctAnswer: 2,
+        },
+        {
+          question: 'Alamat loopback pada IPv6 adalah...',
+          options: ['::1', '127.0.0.1', 'fe80::1', 'ff00::1'],
           correctAnswer: 0,
         },
       ],

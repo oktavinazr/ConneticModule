@@ -3,8 +3,7 @@ import {
   ChevronRight, CheckCircle, XCircle, Lightbulb, HelpCircle, PlayCircle,
   RotateCcw, AlertCircle, Info, BookOpen, GripVertical, PenLine, ArrowRight,
 } from 'lucide-react';
-import { useDrag, useDrop, DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
+import { useDrag, useDrop } from 'react-dnd';
 import { getCurrentUser } from '../../utils/auth';
 import { getLessonProgress, saveStageAttempt } from '../../utils/progress';
 
@@ -604,116 +603,114 @@ function OrderedProcessChain({ items, essayPrompt, lessonId, stageIndex, onCompl
   const isTerminal = validated && (isCorrectOrder || attempts >= 3);
 
   return (
-    <DndProvider backend={HTML5Backend}>
-      <div className="max-w-4xl mx-auto space-y-5">
-        <div className="bg-white rounded-2xl border-2 border-[#628ECB]/20 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-3 px-5 py-3 bg-[#628ECB]/8 border-b border-[#628ECB]/20">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#628ECB]/15">
-              <BookOpen className="w-4 h-4 text-[#628ECB]" />
-            </div>
-            <div className="flex-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#628ECB]">Aktivitas 2 — Analogy Sorting (X.TCP.2)</p>
-              <h3 className="text-sm font-bold text-[#395886]">Urutkan Proses: Kurir vs TCP</h3>
-            </div>
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold
-              ${attempts >= 3 ? 'border-red-200 bg-red-50 text-red-500' : 'border-[#628ECB]/20 bg-white text-[#628ECB]'}`}>
-              <AlertCircle className="w-3 h-3" />
-              {attempts >= 3 ? 'Habis' : `${3 - attempts} percobaan`}
-            </div>
+    <div className="max-w-4xl mx-auto space-y-5">
+      <div className="bg-white rounded-2xl border-2 border-[#628ECB]/20 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-3 bg-[#628ECB]/8 border-b border-[#628ECB]/20">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#628ECB]/15">
+            <BookOpen className="w-4 h-4 text-[#628ECB]" />
           </div>
-          <div className="px-5 py-4 bg-gradient-to-br from-[#628ECB]/5 to-transparent">
-            <div className="flex items-start gap-3">
-              <Lightbulb className="w-4 h-4 text-[#628ECB] mt-0.5 shrink-0" />
-              <p className="text-sm text-[#395886]/80 leading-relaxed font-medium">
-                Susun kartu di bawah agar tugas kurir fisik berpasangan dengan fungsi TCP yang tepat dalam urutan logis yang benar. 
-                Seret kartu untuk mengatur urutan (1-6).
+          <div className="flex-1">
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#628ECB]">Aktivitas 2 — Analogy Sorting (X.TCP.2)</p>
+            <h3 className="text-sm font-bold text-[#395886]">Urutkan Proses: Kurir vs TCP</h3>
+          </div>
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold
+            ${attempts >= 3 ? 'border-red-200 bg-red-50 text-red-500' : 'border-[#628ECB]/20 bg-white text-[#628ECB]'}`}>
+            <AlertCircle className="w-3 h-3" />
+            {attempts >= 3 ? 'Habis' : `${3 - attempts} percobaan`}
+          </div>
+        </div>
+        <div className="px-5 py-4 bg-gradient-to-br from-[#628ECB]/5 to-transparent">
+          <div className="flex items-start gap-3">
+            <Lightbulb className="w-4 h-4 text-[#628ECB] mt-0.5 shrink-0" />
+            <p className="text-sm text-[#395886]/80 leading-relaxed font-medium">
+              Susun kartu di bawah agar tugas kurir fisik berpasangan dengan fungsi TCP yang tepat dalam urutan logis yang benar. 
+              Seret kartu untuk mengatur urutan (1-6).
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {ordered.map((item, index) => (
+          <SortableStepCard
+            key={item.id}
+            item={item}
+            index={index}
+            moveItem={moveItem}
+            validated={validated}
+            isCorrect={item.correctOrder === index + 1}
+            hasAnalogy={hasAnalogy}
+          />
+        ))}
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {!validated && (
+          <button
+            onClick={handleValidate}
+            className="w-full py-3 rounded-xl bg-[#628ECB] text-white font-bold text-sm hover:bg-[#395886] shadow-sm transition-all"
+          >
+            Periksa Urutan & Pasangan
+          </button>
+        )}
+        {validated && !isCorrectOrder && attempts < 3 && (
+          <button onClick={handleRetry} className="w-full py-2.5 rounded-xl font-bold text-sm bg-red-50 text-red-600 border-2 border-red-200 hover:bg-red-100 flex items-center justify-center gap-2">
+            <RotateCcw className="w-4 h-4" /> Perbaiki Urutan
+          </button>
+        )}
+      </div>
+
+      {validated && (
+        <div className={`p-4 rounded-xl border-2 ${isCorrectOrder ? 'bg-[#ECFDF5] border-[#10B981]/30 text-[#065F46]' : attempts < 3 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+          <div className="flex items-start gap-3">
+            {isCorrectOrder ? <CheckCircle className="w-5 h-5 shrink-0 mt-0.5" /> : attempts < 3 ? <XCircle className="w-5 h-5 shrink-0 mt-0.5" /> : <Info className="w-5 h-5 shrink-0 mt-0.5" />}
+            <div>
+              <p className="text-sm font-bold">
+                {isCorrectOrder
+                  ? 'Luar biasa! Kamu memahami alur TCP dengan sangat baik.'
+                  : attempts < 3
+                  ? `${ordered.filter((it, idx) => it.correctOrder === idx + 1).length}/${items.length} posisi benar. Coba lagi!`
+                  : 'Kamu telah mencoba 3 kali. Pelajari urutan yang benar di bawah.'}
               </p>
             </div>
           </div>
         </div>
+      )}
 
-        <div className="space-y-3">
-          {ordered.map((item, index) => (
-            <SortableStepCard
-              key={item.id}
-              item={item}
-              index={index}
-              moveItem={moveItem}
-              validated={validated}
-              isCorrect={item.correctOrder === index + 1}
-              hasAnalogy={hasAnalogy}
-            />
-          ))}
-        </div>
-
-        <div className="mt-4 space-y-3">
-          {!validated && (
-            <button
-              onClick={handleValidate}
-              className="w-full py-3 rounded-xl bg-[#628ECB] text-white font-bold text-sm hover:bg-[#395886] shadow-sm transition-all"
-            >
-              Periksa Urutan & Pasangan
-            </button>
-          )}
-          {validated && !isCorrectOrder && attempts < 3 && (
-            <button onClick={handleRetry} className="w-full py-2.5 rounded-xl font-bold text-sm bg-red-50 text-red-600 border-2 border-red-200 hover:bg-red-100 flex items-center justify-center gap-2">
-              <RotateCcw className="w-4 h-4" /> Perbaiki Urutan
-            </button>
-          )}
-        </div>
-
-        {validated && (
-          <div className={`p-4 rounded-xl border-2 ${isCorrectOrder ? 'bg-[#ECFDF5] border-[#10B981]/30 text-[#065F46]' : attempts < 3 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-            <div className="flex items-start gap-3">
-              {isCorrectOrder ? <CheckCircle className="w-5 h-5 shrink-0 mt-0.5" /> : attempts < 3 ? <XCircle className="w-5 h-5 shrink-0 mt-0.5" /> : <Info className="w-5 h-5 shrink-0 mt-0.5" />}
-              <div>
-                <p className="text-sm font-bold">
-                  {isCorrectOrder
-                    ? 'Luar biasa! Kamu memahami alur TCP dengan sangat baik.'
-                    : attempts < 3
-                    ? `${ordered.filter((it, idx) => it.correctOrder === idx + 1).length}/${items.length} posisi benar. Coba lagi!`
-                    : 'Kamu telah mencoba 3 kali. Pelajari urutan yang benar di bawah.'}
-                </p>
+      {isTerminal && !isCorrectOrder && (
+        <div className="mt-4 p-4 rounded-xl bg-amber-50 border-2 border-amber-200 shadow-sm">
+          <h4 className="text-xs font-black uppercase tracking-widest text-amber-600 mb-3 flex items-center gap-2">
+            <Lightbulb className="w-4 h-4" /> Kunci Urutan yang Benar
+          </h4>
+          <div className="space-y-2">
+            {[...items].sort((a, b) => (a.correctOrder ?? 0) - (b.correctOrder ?? 0)).map((item, idx) => (
+              <div key={item.id} className="flex items-center gap-3 text-xs font-medium text-[#395886]/80 p-2 rounded-lg bg-white/50">
+                <span className="font-black text-amber-600">{idx + 1}.</span>
+                <span>{item.courierAnalogy || item.text} → {item.text}</span>
               </div>
-            </div>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {isTerminal && !isCorrectOrder && (
-          <div className="mt-4 p-4 rounded-xl bg-amber-50 border-2 border-amber-200 shadow-sm">
-            <h4 className="text-xs font-black uppercase tracking-widest text-amber-600 mb-3 flex items-center gap-2">
-              <Lightbulb className="w-4 h-4" /> Kunci Urutan yang Benar
-            </h4>
-            <div className="space-y-2">
-              {[...items].sort((a, b) => (a.correctOrder ?? 0) - (b.correctOrder ?? 0)).map((item, idx) => (
-                <div key={item.id} className="flex items-center gap-3 text-xs font-medium text-[#395886]/80 p-2 rounded-lg bg-white/50">
-                  <span className="font-black text-amber-600">{idx + 1}.</span>
-                  <span>{item.courierAnalogy || item.text} → {item.text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Essay X.TCP.2 - Inline Reflection */}
-        {showEssay && essayPrompt && (
-          <EssayBox
-            prompt={essayPrompt}
-            objectiveLabel="X.TCP.2"
-            submitLabel="Selesaikan & Lanjutkan"
-            onSubmit={(text) => onComplete(text)}
-          />
-        )}
-        {showEssay && !essayPrompt && (
-          <button
-            onClick={() => onComplete(undefined)}
-            className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#628ECB] text-white font-bold text-sm hover:bg-[#395886] shadow-sm transition-all"
-          >
-            Lanjutkan ke Tahap Berikutnya <ChevronRight className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-    </DndProvider>
+      {/* Essay X.TCP.2 - Inline Reflection */}
+      {showEssay && essayPrompt && (
+        <EssayBox
+          prompt={essayPrompt}
+          objectiveLabel="X.TCP.2"
+          submitLabel="Selesaikan & Lanjutkan"
+          onSubmit={(text) => onComplete(text)}
+        />
+      )}
+      {showEssay && !essayPrompt && (
+        <button
+          onClick={() => onComplete(undefined)}
+          className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#628ECB] text-white font-bold text-sm hover:bg-[#395886] shadow-sm transition-all"
+        >
+          Lanjutkan ke Tahap Berikutnya <ChevronRight className="w-4 h-4" />
+        </button>
+      )}
+    </div>
   );
 }
 

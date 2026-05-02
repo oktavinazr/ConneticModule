@@ -45,7 +45,7 @@ export const lesson1Stages: Stage[] = [
         },
         {
           id: 'f6',
-          text: 'Di sisi penerima, segmen disusun kembali sesuai urutannya sehingga chat terbaca utuh dan file presentasi bisa dibuka dengan benar.',
+          text: 'Di sisi penerima, segmen disusun kembali sesuai urutannya sehingga chat terbaca utuh and file presentasi bisa dibuka dengan benar.',
           order: 6,
         },
       ],
@@ -128,11 +128,26 @@ export const lesson1Stages: Stage[] = [
     atpAbcd: {
       audience: 'Peserta didik kelas X.',
       behavior:
-        'Mengurutkan 5 lapisan TCP/IP dan memasangkan fungsi yang tepat pada setiap lapisan.',
+        'Mengurutkan 5 lapisan TCP/IP and memasangkan fungsi yang tepat pada setiap lapisan.',
       condition:
         'Diberi visual clickable layer stack, Interactive Layer Sorter, dan Matching Connector berbasis web.',
       degree:
-        'Mampu menyusun urutan layer secara tepat dan menjelaskan fungsi setiap layer melalui refleksi tertulis.',
+        'Mampu menyusun urutan layer secara tepat and menjelaskan fungsi setiap layer melalui refleksi tertulis.',
+    },
+    material: {
+      title: 'Struktur 5 Lapisan TCP/IP',
+      content: [
+        'TCP/IP adalah sekumpulan protokol yang digunakan untuk komunikasi data dalam jaringan komputer.',
+        'Model TCP/IP terdiri dari 5 lapisan hierarki yang bekerja sama untuk mengirimkan data dari pengirim ke penerima.',
+        'Setiap lapisan menambahkan informasi kontrol (header) ke data yang akan dikirim, proses ini disebut Enkapsulasi.',
+      ],
+      examples: [
+        'Application Layer: HTTP, HTTPS, SMTP, FTP.',
+        'Transport Layer: TCP, UDP.',
+        'Internet Layer: IP, ICMP.',
+        'Data Link Layer: Ethernet, Wi-Fi.',
+        'Physical Layer: Kabel UTP, Serat Optik.',
+      ],
     },
     explorationSections: [
       {
@@ -297,7 +312,7 @@ export const lesson1Stages: Stage[] = [
         text: 'Window Size, karena kerusakan data terjadi saat buffer penerima terlalu penuh.',
         isCorrect: false,
         feedback:
-          'Window Size berkaitan dengan flow control, bukan deteksi data corruption pada isi segmen.',
+          'Window Size berkaitan dengan flow control, bukan deteksi data corruption pada isi pengiriman.',
       },
     ],
     questionBank: [
@@ -311,7 +326,7 @@ export const lesson1Stages: Stage[] = [
         id: 'q2',
         text: 'Mengapa segmen rusak bisa memicu retransmission?',
         response:
-          'Segmen yang gagal diverifikasi tidak dianggap berhasil diterima. Akibatnya pengirim tidak mendapat konfirmasi yang valid dan akan mengirim ulang segmen tersebut.',
+          'Segmen yang gagal diverifikasi tidak dianggap berhasil diterima. Akibatnya pengirim tidak mendapat konfirmasi yang valid and akan mengirim ulang segmen tersebut.',
       },
       {
         id: 'q3',
@@ -325,252 +340,66 @@ export const lesson1Stages: Stage[] = [
     type: 'learning-community',
     title: 'Learning Community',
     description:
-      'Siswa memvalidasi pemikiran melalui voting, komentar, dan perbandingan analisis decapsulation bersama komunitas belajar.',
+      'Berkolaborasi dalam kelompok untuk membangun logika kolektif tentang alur data TCP/IP melalui 4 tahap sistematis.',
     objectiveCode: 'X.TCP.6 & X.TCP.7',
     activityGuide: [
-      'Simak visualisasi interaktif TCP/IP U-Shape untuk memahami alur encapsulation dan decapsulation secara menyeluruh.',
-      'Pada X.TCP.6, susun urutan proses encapsulation (dari Application ke Network Access) berdasarkan skenario pengiriman email.',
-      'Bandingkan jawabanmu dengan analisis teman kelompok pada Group Answer Panel.',
-      'Pada X.TCP.7, susun urutan decapsulation (dari Network Access ke Application) dan validasi logika analisis teman.',
+      'Simak Simulasi Interaktif TCP/IP sebagai fondasi awal.',
+      'Selesaikan Aktivitas X.TCP.6 (Enkapsulasi) melalui eksplorasi konsep, studi kasus, dan diskusi kelompok.',
+      'Selesaikan Aktivitas X.TCP.7 (Dekapsulasi) dengan alur yang identik untuk sisi penerima.',
+      'Lihat Hasil Keseluruhan Kelompok sebagai kesimpulan logika kolektif kalian.',
     ],
     logicalThinkingIndicators: [
-      'Kemampuan Berargumen: memberi penguatan atau koreksi terhadap jawaban teman.',
-      'Keruntutan Berpikir: memeriksa urutan decapsulation secara tepat.',
-      'Penarikan Kesimpulan: membedakan analisis yang logis dan yang keliru.',
-    ],
-    facilitatorNotes: [
-      'Guru memfasilitasi diskusi singkat tentang mengapa satu solusi lebih tepat untuk skenario multi-perangkat.',
-      'Guru meminta siswa membuktikan urutan decapsulation dengan dasar layer yang menambah dan melepas header.',
+      'Kemampuan Berargumen: menyampaikan alasan logis di balik urutan proses.',
+      'Validasi Komunal: melakukan voting terhadap pemikiran rekan sejawat dalam kelompok.',
     ],
     atpAbcd: {
       audience: 'Peserta didik kelas X.',
-      behavior:
-        'Memilih metode komunikasi terbaik dan membandingkan urutan decapsulation secara logis.',
-      condition:
-        'Diberi skenario peer voting, komentar komunitas, dan aktivitas perbandingan kasus pada media interaktif.',
-      degree:
-        'Mampu memberi pilihan yang beralasan serta memvalidasi jawaban teman secara tepat.',
+      behavior: 'Menganalisis, menyusun, dan mendiskusikan urutan proses TCP/IP 5-layer dalam kelompok.',
+      condition: 'Diberi alur terintegrasi dari visualisasi, case study ordering, hingga argument board.',
+      degree: 'Mampu menyusun urutan dengan benar and memberikan argumen logis yang dapat diterima komunitas.',
     },
-    peerVotingScenario: {
-      context:
-        'Laboratorium komputer sekolah menggunakan banyak perangkat secara bersamaan saat simulasi ujian. Saat trafik tinggi, collision sering muncul karena sebagian perangkat masih berbagi medium lama yang sama.',
-      question:
-        'Metode komunikasi jaringan mana yang paling efektif untuk mengurangi collision pada skenario laboratorium tersebut?',
-      methods: [
-        {
-          id: 'm1',
-          title: 'CSMA/CD standar',
-          description:
-            'Perangkat mendengarkan media sebelum mengirim, lalu berhenti dan mencoba lagi bila collision terjadi.',
-          votes: 7,
-          pros: 'Mudah dipahami dan sudah dikenal pada Ethernet lama.',
-          cons: 'Collision tetap mungkin terjadi dan performa turun saat banyak perangkat aktif.',
-        },
-        {
-          id: 'm2',
-          title: 'Token Ring',
-          description:
-            'Perangkat harus menunggu token sebelum mengirim sehingga giliran pengiriman menjadi teratur.',
-          votes: 4,
-          pros: 'Collision dapat dihindari karena hanya pemegang token yang boleh mengirim.',
-          cons: 'Kurang relevan untuk infrastruktur modern dan lebih lambat untuk implementasi saat ini.',
-        },
-        {
-          id: 'm3',
-          title: 'Full-duplex dengan managed switch',
-          description:
-            'Setiap port switch menjadi collision domain tersendiri dan perangkat dapat kirim-terima data secara bersamaan.',
-          votes: 19,
-          pros: 'Menghilangkan collision per port dan memberi bandwidth lebih stabil untuk banyak pengguna.',
-          cons: 'Membutuhkan perangkat switch yang baik dan konfigurasi yang benar.',
-        },
-      ],
-      correctMethodId: 'm3',
-    },
-    peerComments: [
-      {
-        name: 'Dika R.',
-        avatar: 'DR',
-        comment:
-          'Saya memilih full-duplex dengan managed switch karena collision domain dipisahkan per port, jadi tabrakan data tidak lagi terjadi seperti pada media bersama.',
-        votedFor: 'm3',
-      },
-      {
-        name: 'Sari N.',
-        avatar: 'SN',
-        comment:
-          'CSMA/CD memang ada di Ethernet, tetapi saat banyak perangkat aktif bersamaan performanya cepat turun.',
-        votedFor: 'm1',
-      },
-      {
-        name: 'Budi P.',
-        avatar: 'BP',
-        comment:
-          'Token Ring menarik secara teori, tetapi untuk laboratorium modern managed switch jauh lebih realistis.',
-        votedFor: 'm3',
-      },
-      {
-        name: 'Ayu M.',
-        avatar: 'AM',
-        comment:
-          'Managed switch juga membantu prioritas trafik jika nanti laboratorium perlu membedakan layanan penting dan tidak penting.',
-        votedFor: 'm3',
-      },
+    // Data untuk 5 Layer
+    layers5: [
+      { id: 'L5', name: 'Application', pdu: 'Data', color: '#8B5CF6', desc: 'Alya membuat email dan melampirkan file tugas.' },
+      { id: 'L4', name: 'Transport', pdu: 'Segment', color: '#628ECB', desc: 'Menambahkan TCP Header untuk memastikan email sampai dengan utuh.' },
+      { id: 'L3', name: 'Network', pdu: 'Packet', color: '#10B981', desc: 'Menambahkan alamat IP agar paket email tahu rute ke server tujuan.' },
+      { id: 'L2', name: 'Data Link', pdu: 'Frame', color: '#F59E0B', desc: 'Menambahkan MAC Address untuk transmisi antar perangkat jaringan lokal.' },
+      { id: 'L1', name: 'Physical', pdu: 'Bits', color: '#395886', desc: 'Mengirimkan email dalam bentuk pulsa biner (bits) melalui kabel/Wi-Fi.' },
     ],
-    caseComparisonData: {
-      title: 'Perbandingan urutan decapsulation TCP/IP',
-      process: [
-        {
-          id: 'dc1',
-          step: 'Network Access Layer menerima sinyal dan mengubahnya menjadi frame digital.',
-          correctOrder: 1,
-        },
-        {
-          id: 'dc2',
-          step: 'Frame Header diperiksa lalu dilepas agar data bisa naik ke Internet Layer.',
-          correctOrder: 2,
-        },
-        {
-          id: 'dc3',
-          step: 'Internet Layer memeriksa alamat IP tujuan lalu melepas IP Header.',
-          correctOrder: 3,
-        },
-        {
-          id: 'dc4',
-          step: 'Transport Layer memverifikasi checksum, menyusun segmen, lalu melepas TCP Header.',
-          correctOrder: 4,
-        },
-        {
-          id: 'dc5',
-          step: 'Application Layer menerima kembali data utuh yang siap dipakai aplikasi.',
-          correctOrder: 5,
-        },
-      ],
-      peerAnalyses: [
-        {
-          name: 'Reza A.',
-          analysis:
-            'Decapsulation dimulai dari layer paling bawah karena frame datang sebagai sinyal fisik lebih dulu, lalu setiap header dilepas satu per satu sampai data sampai ke aplikasi.',
-          isCorrect: true,
-        },
-        {
-          name: 'Maya L.',
-          analysis:
-            'TCP Header harus dilepas lebih dulu karena Transport Layer lebih penting daripada Internet Layer.',
-          isCorrect: false,
-        },
-        {
-          name: 'Fajar K.',
-          analysis:
-            'Urutan decapsulation adalah kebalikan encapsulation. Layer yang terakhir menambah pembungkus akan menjadi yang pertama melepasnya.',
-          isCorrect: true,
-        },
-      ],
-    },
-    encapsulationCaseData: {
-      title: 'Studi Kasus Encapsulation — Proses Pengiriman Data (X.TCP.6)',
-      process: [
-        {
-          id: 'en1',
-          step: 'Application Layer: Alya menekan "Kirim" di aplikasi email. Data pesan dan lampiran file disiapkan oleh aplikasi.',
-          correctOrder: 1,
-        },
-        {
-          id: 'en2',
-          step: 'Transport Layer: Data dipecah menjadi segmen-segmen kecil. TCP Header (Source Port, Sequence Number, Checksum) ditambahkan ke setiap segmen.',
-          correctOrder: 2,
-        },
-        {
-          id: 'en3',
-          step: 'Internet Layer: Setiap segmen diberi IP Header berisi alamat IP sumber (laptop Alya) dan tujuan (server email teman).',
-          correctOrder: 3,
-        },
-        {
-          id: 'en4',
-          step: 'Network Access Layer: Paket IP dibungkus menjadi Frame dengan MAC Address dan FCS, lalu diubah menjadi sinyal listrik untuk dikirim melalui kabel.',
-          correctOrder: 4,
-        },
-      ],
-      groupAnswers: [
-        {
-          name: 'Dika R.',
-          isCorrect: true,
-          analysis:
-            'Encapsulation bergerak dari atas (aplikasi) ke bawah (fisik). Application menghasilkan data, lalu Transport memecahnya dan menambah header TCP, Internet menambah IP, terakhir Network Access membungkus jadi frame.',
-        },
-        {
-          name: 'Sari N.',
-          isCorrect: false,
-          analysis:
-            'Menurut saya Internet Layer harus berjalan lebih dulu agar alamat IP tersedia, baru kemudian Transport Layer bisa mengirim segmen.',
-        },
-        {
-          name: 'Budi P.',
-          isCorrect: true,
-          analysis:
-            'Alur encapsulation dari Application → Transport → Internet → Network Access. Setiap lapisan menambahkan headernya masing-masing sebelum diteruskan ke bawah.',
-        },
-        {
-          name: 'Ayu M.',
-          isCorrect: false,
-          analysis:
-            'Saya meletakkan Network Access di urutan kedua karena koneksi fisik harus siap sebelum data bisa dipecah-pecah oleh TCP.',
-        },
-      ],
-    },
-    matchingPairs: [
-      { left: 'TCP Header dilepas di', right: 'Transport Layer' },
-      { left: 'IP Header dilepas di', right: 'Internet Layer' },
-      { left: 'Frame Header dilepas di', right: 'Network Access Layer' },
-    ],
-    caseScenario: {
-      title: 'Urutan decapsulation',
-      description: 'Analisis proses decapsulation TCP/IP.',
-      question: 'Urutkan proses decapsulation yang benar.',
+    encapsulationCase: {
+      id: 'X.TCP.6',
+      title: 'Aktivitas X.TCP.6: Enkapsulasi (Sender Side)',
+      concept: 'Enkapsulasi adalah proses "pembungkusan" data dari lapisan atas ke bawah. Bayangkan seperti mengirim kado: kamu membungkus barang (Data), memasukkannya ke kotak (Segment/Packet), lalu memberi label alamat (Frame/Bits) agar siap dikirim.',
+      scenario: 'Alya sedang mengirim email tugas kepada gurunya. Saat ia menekan tombol "Kirim", data email tersebut harus melewati proses enkapsulasi agar tidak rusak atau salah alamat di perjalanan.',
+      question: 'Manakah logika urutan pembungkusan yang menurutmu paling aman agar email Alya sampai dengan utuh?',
       options: [
-        {
-          id: 'o1',
-          text: 'Network Access -> Internet -> Transport -> Application',
-          isCorrect: true,
-          feedback: 'Tepat. Decapsulation bergerak dari bawah ke atas.',
-        },
-        {
-          id: 'o2',
-          text: 'Application -> Transport -> Internet -> Network Access',
-          isCorrect: false,
-          feedback: 'Itu adalah arah encapsulation, bukan decapsulation.',
-        },
-      ],
+        { id: 'e_opt1', text: 'Membungkus data dari lapisan aplikasi turun satu per satu (L5 → L1) agar setiap lapisan memiliki identitas lengkap.', logic: 'Menjamin keruntutan protokol standar.' },
+        { id: 'e_opt2', text: 'Memberikan alamat rute IP terlebih dahulu di awal agar data langsung tahu jalannya, baru kemudian menentukan aplikasi pengirimnya.', logic: 'Memprioritaskan kecepatan penentuan jalur.' },
+        { id: 'e_opt3', text: 'Memecah data menjadi bagian-bagian kecil (segmentasi) terlebih dahulu sebelum menambahkan identitas lainnya.', logic: 'Memprioritaskan efisiensi penanganan data besar.' }
+      ]
     },
-    peerAnswers: [
-      {
-        name: 'Reza A.',
-        role: 'Siswa',
-        answer:
-          'Decapsulation dimulai dari Network Access ke Application karena setiap header dilepas sesuai urutan pembungkusannya.',
-        score: 95,
-      },
-      {
-        name: 'Fajar K.',
-        role: 'Siswa',
-        answer:
-          'Urutannya adalah Network Access, Internet, Transport, lalu Application.',
-        score: 90,
-      },
-      {
-        name: 'Maya L.',
-        role: 'Siswa',
-        answer:
-          'TCP Header saya letakkan lebih dulu karena menurut saya transport lebih penting dari IP.',
-        score: 40,
-      },
-    ],
+    decapsulationCase: {
+      id: 'X.TCP.7',
+      title: 'Aktivitas X.TCP.7: Dekapsulasi (Receiver Side)',
+      concept: 'Dekapsulasi adalah proses sebaliknya, yaitu "membuka bungkus" kado dari lapisan terbawah ke atas. Komputer penerima menerima sinyal fisik, membuka kotak luar, memverifikasi alamat, hingga akhirnya menampilkan isi kado asli ke aplikasi.',
+      scenario: 'Komputer tujuan menerima kiriman data email Alya dalam bentuk bit-bit listrik. Sistem harus melakukan dekapsulasi untuk menampilkan kembali isi email tersebut di layar monitor.',
+      question: 'Bagaimana komputer penerima sebaiknya membuka bungkus data agar pesan Alya terbaca dengan benar?',
+      options: [
+        { id: 'd_opt1', text: 'Membuka semua bungkus sekaligus di awal agar aplikasi bisa langsung menampilkan data secepat mungkin.', logic: 'Memprioritaskan kecepatan penyajian data.' },
+        { id: 'd_opt2', text: 'Memverifikasi dan melepas bungkus satu per satu dari lapisan terbawah naik ke atas (L1 → L5) untuk akurasi alamat.', logic: 'Menjamin validasi data di setiap tahap.' },
+        { id: 'd_opt3', text: 'Menunggu semua potongan paket terkumpul lengkap terlebih dahulu di memori, baru kemudian membukanya dari lapisan atas.', logic: 'Menjamin kelengkapan data sebelum diproses.' }
+      ]
+    },
+    groupActivity: {
+      groupNames: ['Kelompok 1', 'Kelompok 2', 'Kelompok 3', 'Kelompok 4', 'Kelompok 5', 'Kelompok 6', 'Kelompok 7', 'Kelompok 8'],
+      discussionPrompt: 'Diskusikan logika kalian. Berikan vote pada argumen yang menurut kalian paling mendalam dan sesuai dengan fungsi layer.',
+    }
   },
   {
     type: 'modeling',
     title: 'Modeling',
     description:
-      'Siswa mengikuti simulasi langkah demi langkah proses encapsulation, transmission, dan decapsulation untuk memahami cara kerja TCP secara utuh.',
+      'Siswa mengikuti simulasi langkah demi langkah proses encapsulation, transmission, and decapsulation untuk memahami cara kerja TCP secara utuh.',
     objectiveCode: 'X.TCP.8',
     activityGuide: [
       'Ikuti urutan simulasi dari Application Layer sampai data diterima kembali.',
@@ -593,13 +422,25 @@ export const lesson1Stages: Stage[] = [
       degree:
         'Mampu menyelesaikan seluruh rangkaian langkah dengan urutan yang benar.',
     },
+    practiceInstructions: {
+      forTeacher: [
+        'Demonstrasikan proses pembuatan data di Application Layer dan penambahan header di Transport/Internet Layer.',
+        'Jelaskan perubahan bentuk PDU di setiap langkah (Data -> Segment -> Packet -> Frame).',
+        'Gunakan simulasi untuk menunjukkan perjalanan paket melintasi media jaringan.',
+      ],
+      forStudent: [
+        'Ikuti langkah-langkah pelepasan header (decapsulation) di sisi penerima.',
+        'Pastikan urutan pelepasan header benar mulai dari lapisan terbawah.',
+        'Amati hasil akhir data yang diterima di Application Layer.',
+      ],
+    },
     modelingSteps: [
       {
         id: 'mw1',
         type: 'example',
         title: 'Step 1 - Application Layer membuat data',
         content:
-          'Alya menulis pesan dan menyiapkan lampiran tugas pada aplikasi email. Pada tahap ini data masih berupa isi pesan dan file asli tanpa header jaringan.',
+          'Alya menulis pesan dan menyiapkan lampiran tugas pada aplikasi email. Pada tahap ini data masih berupa isi pesan and file asli tanpa header jaringan.',
         interactiveAction:
           'Teruskan data dari aplikasi ke Transport Layer untuk memulai proses pengiriman.',
       },
@@ -626,7 +467,7 @@ export const lesson1Stages: Stage[] = [
         type: 'example',
         title: 'Step 4 - Network Access Layer mengirim frame',
         content:
-          'Paket dibungkus menjadi frame dan diubah menjadi sinyal agar dapat melintas melalui media jaringan.',
+          'Paket dibungkus menjadi frame and diubah menjadi sinyal agar dapat melintas melalui media jaringan.',
         interactiveAction:
           'Kirim frame ke media jaringan dan bayangkan paket melintasi router menuju tujuan.',
       },
@@ -646,7 +487,7 @@ export const lesson1Stages: Stage[] = [
         content:
           'Internet Layer memeriksa alamat tujuan. Setelah cocok, IP Header dilepas agar segmen diteruskan ke TCP.',
         interactiveAction:
-          'Verifikasi alamat IP dan lepaskan IP Header untuk melanjutkan proses decapsulation.',
+          'Verifikasi alamat IP and lepaskan IP Header untuk melanjutkan proses decapsulation.',
       },
       {
         id: 'mw7',
@@ -662,7 +503,7 @@ export const lesson1Stages: Stage[] = [
         type: 'practice',
         title: 'Step 8 - Application menerima data utuh',
         content:
-          'Setelah semua header dilepas, aplikasi penerima mendapatkan kembali pesan dan file yang sama seperti saat dikirim.',
+          'Setelah semua header dilepas, aplikasi penerima mendapatkan kembali pesan and file yang sama seperti saat dikirim.',
         interactiveAction:
           'Buka kembali pesan dan lampiran di aplikasi untuk menutup seluruh alur TCP.',
       },
@@ -672,7 +513,7 @@ export const lesson1Stages: Stage[] = [
     type: 'reflection',
     title: 'Reflection',
     description:
-      'Siswa menyusun peta konsep dan refleksi tertulis untuk merangkum hubungan antar konsep TCP dari encapsulation hingga decapsulation.',
+      'Siswa menyusun peta konsep and refleksi tertulis untuk merangkum hubungan antar konsep TCP dari encapsulation hingga decapsulation.',
     objectiveCode: 'X.TCP.9',
     activityGuide: [
       'Lengkapi peta konsep terlebih dahulu agar hubungan antar ide utama terlihat jelas.',
@@ -689,11 +530,11 @@ export const lesson1Stages: Stage[] = [
     atpAbcd: {
       audience: 'Peserta didik kelas X.',
       behavior:
-        'Menyusun peta konsep dan menuliskan kesimpulan visual tentang hubungan konsep TCP utama.',
+        'Menyusun peta konsep and menuliskan kesimpulan visual tentang hubungan konsep TCP utama.',
       condition:
         'Diberi Concept Map Builder, jurnal refleksi, dan lembar penilaian diri pada media interaktif.',
       degree:
-        'Mampu menghubungkan konsep dengan tepat dan menuliskan refleksi yang menunjukkan pemahaman menyeluruh.',
+        'Mampu menghubungkan konsep dengan tepat and menuliskan refleksi yang menunjukkan pemahaman menyeluruh.',
     },
     conceptMapNodes: [
       {
@@ -756,7 +597,7 @@ export const lesson1Stages: Stage[] = [
     ],
     essayReflection: {
       materialSummaryPrompt:
-        'Jelaskan dengan bahasamu sendiri apa itu TCP dan bagaimana encapsulation serta decapsulation saling berhubungan.',
+        'Jelaskan dengan bahasamu sendiri apa itu TCP and bagaimana encapsulation serta decapsulation saling berhubungan.',
       easyPartPrompt:
         'Bagian konsep TCP mana yang paling mudah kamu pahami hari ini? Jelaskan alasannya.',
       hardPartPrompt:
@@ -766,10 +607,10 @@ export const lesson1Stages: Stage[] = [
       { id: 'sc1', label: 'Saya mampu mendefinisikan TCP dalam jaringan komputer.' },
       { id: 'sc2', label: 'Saya mampu menentukan fungsi utama TCP melalui analogi.' },
       { id: 'sc3', label: 'Saya mampu mengurutkan lapisan TCP/IP dalam proses encapsulation.' },
-      { id: 'sc4', label: 'Saya mampu mengidentifikasi fungsi Source Port, Destination Port, Sequence Number, dan Checksum.' },
+      { id: 'sc4', label: 'Saya mampu mengidentifikasi fungsi Source Port, Destination Port, Sequence Number, and Checksum.' },
       { id: 'sc5', label: 'Saya mampu menganalisis masalah paket data dengan memilih field TCP Header yang relevan.' },
       { id: 'sc6', label: 'Saya mampu memberi argumentasi pada skenario peer voting.' },
-      { id: 'sc7', label: 'Saya mampu memvalidasi urutan decapsulation dan logika jawaban teman.' },
+      { id: 'sc7', label: 'Saya mampu memvalidasi urutan decapsulation and logika jawaban teman.' },
       { id: 'sc8', label: 'Saya mampu mengikuti alur encapsulation sampai decapsulation secara lengkap.' },
       { id: 'sc9', label: 'Saya mampu menyusun hubungan antar konsep TCP menjadi satu peta konsep.' },
       { id: 'sc10', label: 'Saya mampu mengambil keputusan teknis pada studi kasus TCP secara autentik.' },
@@ -779,12 +620,12 @@ export const lesson1Stages: Stage[] = [
     type: 'authentic-assessment',
     title: 'Authentic Assessment',
     description:
-      'Siswa menyelesaikan studi kasus bercabang yang menilai analisis, argumentasi, dan penarikan kesimpulan pada beberapa masalah pengiriman paket TCP.',
+      'Siswa menyelesaikan studi kasus bercabang yang menilai analisis, argumentasi, and penarikan kesimpulan pada beberapa masalah pengiriman paket TCP.',
     objectiveCode: 'X.TCP.10',
     activityGuide: [
-      'Baca konteks, bukti masalah, dan fokus gangguan sebelum mengambil keputusan awal.',
+      'Baca konteks, bukti masalah, and fokus gangguan sebelum mengambil keputusan awal.',
       'Pilih jalur diagnosis yang paling logis lalu jelaskan alasan setiap pilihanmu.',
-      'Ikuti cabang kasus sampai akhir dan simpulkan langkah prioritas perbaikannya.',
+      'Ikuti cabang kasus sampai akhir and simpulkan langkah prioritas perbaikannya.',
     ],
     logicalThinkingIndicators: [
       'Keruntutan Berpikir: menentukan urutan diagnosis yang paling masuk akal.',
@@ -793,20 +634,20 @@ export const lesson1Stages: Stage[] = [
     ],
     facilitatorNotes: [
       'Guru memosisikan diri sebagai fasilitator yang menanyakan alasan prioritas tindakan siswa.',
-      'Guru menggunakan hasil jalur keputusan untuk melihat apakah siswa mampu membedakan collision, packet loss, dan data corruption.',
+      'Guru menggunakan hasil jalur keputusan untuk melihat apakah siswa mampu membedakan collision, packet loss, and data corruption.',
     ],
     atpAbcd: {
       audience: 'Peserta didik kelas X.',
       behavior:
-        'Mendiagnosis masalah pengiriman paket TCP dan menentukan prioritas solusi berdasarkan bukti kasus.',
+        'Mendiagnosis masalah pengiriman paket TCP and menentukan prioritas solusi berdasarkan bukti kasus.',
       condition:
-        'Diberi Branching Troubleshooter dengan kondisi collision, packet loss, dan data corruption serta konsekuensi pada setiap keputusan.',
+        'Diberi Branching Troubleshooter dengan kondisi collision, packet loss, and data corruption serta konsekuensi pada setiap keputusan.',
       degree:
-        'Mampu memilih jalur diagnosis yang logis, menjelaskan alasan, dan menyimpulkan prioritas solusi secara tepat.',
+        'Mampu memilih jalur diagnosis yang logis, menjelaskan alasan, and menyimpulkan prioritas solusi secara tepat.',
     },
     branchingScenario: {
       context:
-        'Kamu menjadi teknisi jaringan pada studio pembelajaran daring sekolah. Menjelang siaran kelas live, sistem monitoring menunjukkan tiga gejala sekaligus: collision burst pada segmen lama yang masih memakai hub, packet loss tinggi pada uplink internet, dan data corruption pada beberapa segmen yang melewati patch cord yang mulai rusak.',
+        'Kamu menjadi teknisi jaringan pada studio pembelajaran daring sekolah. Menjelang siaran kelas live, sistem monitoring menunjukkan tiga gejala sekaligus: collision burst pada segmen lama yang masih memakai hub, packet loss tinggi pada uplink internet, and data corruption pada beberapa segmen yang melewati patch cord yang mulai rusak.',
       initialQuestion:
         'Langkah awal mana yang paling profesional untuk memulai diagnosis masalah pengiriman paket TCP ini?',
       focusAreas: ['Collision', 'Packet Loss', 'Data Corruption'],
@@ -814,10 +655,10 @@ export const lesson1Stages: Stage[] = [
         {
           id: 'c1',
           text:
-            'Analisis log TCP dan topologi jaringan lebih dulu untuk memetakan pola collision, packet loss, dan checksum error.',
+            'Analisis log TCP and topologi jaringan lebih dulu untuk memetakan pola collision, packet loss, and checksum error.',
           isOptimal: true,
           consequence:
-            'Pilihanmu tepat. Dari log ditemukan collision burst pada segmen yang masih memakai hub, packet loss 28% pada uplink utama, dan checksum error 11% pada jalur yang memakai patch cord rusak.',
+            'Pilihanmu tepat. Dari log ditemukan collision burst pada segmen yang masih memakai hub, packet loss 28% pada uplink utama, and checksum error 11% pada jalur yang memakai patch cord rusak.',
           followUpQuestion:
             'Masalah mana yang harus diprioritaskan lebih dulu agar kualitas live class paling cepat stabil untuk semua pengguna?',
           followUpChoices: [
@@ -827,7 +668,7 @@ export const lesson1Stages: Stage[] = [
                 'Packet loss pada uplink internet, karena kehilangan paket tinggi langsung menurunkan kualitas layanan untuk seluruh pengguna.',
               isCorrect: true,
               explanation:
-                'Prioritas ini paling logis karena packet loss 28% memukul seluruh aliran data utama. Setelah throughput stabil, collision pada segmen hub dan data corruption karena kabel rusak dapat ditangani bertahap.',
+                'Prioritas ini paling logis karena packet loss 28% memukul seluruh aliran data utama. Setelah throughput stabil, collision pada segmen hub and data corruption karena kabel rusak dapat ditangani bertahap.',
             },
             {
               id: 'f1b',
@@ -835,7 +676,7 @@ export const lesson1Stages: Stage[] = [
                 'Collision pada segmen hub, karena collision selalu lebih penting daripada masalah lain.',
               isCorrect: false,
               explanation:
-                'Collision memang harus ditangani, tetapi dampak packet loss pada uplink utama lebih luas dan lebih cepat merusak layanan live untuk semua pengguna.',
+                'Collision memang harus ditangani, tetapi dampak packet loss pada uplink utama lebih luas and lebih cepat merusak layanan live for semua pengguna.',
             },
             {
               id: 'f1c',
@@ -849,17 +690,17 @@ export const lesson1Stages: Stage[] = [
         },
         {
           id: 'c2',
-          text: 'Restart semua perangkat jaringan dan server streaming agar koneksi TCP dimulai ulang.',
+          text: 'Restart semua perangkat jaringan and server streaming agar koneksi TCP dimulai ulang.',
           isOptimal: false,
           consequence:
-            'Restart menghabiskan waktu, tetapi akar masalah belum terlihat. Setelah sistem kembali hidup, collision, packet loss, dan checksum error masih tetap muncul.',
+            'Restart menghabiskan waktu, tetapi akar masalah belum terlihat. Setelah sistem kembali hidup, collision, packet loss, and checksum error masih tetap muncul.',
           followUpQuestion:
             'Setelah restart gagal, langkah apa yang seharusnya dilakukan untuk mendapatkan bukti teknis yang jelas?',
           followUpChoices: [
             {
               id: 'f2a',
               text:
-                'Analisis log TCP dan topologi untuk melihat pola kehilangan ACK, collision, dan checksum error.',
+                'Analisis log TCP and topologi untuk melihat pola kehilangan ACK, collision, and checksum error.',
               isCorrect: true,
               explanation:
                 'Langkah ini memberi bukti teknis yang dapat dipakai untuk menentukan prioritas penanganan secara objektif.',
@@ -870,7 +711,7 @@ export const lesson1Stages: Stage[] = [
                 'Menunggu beberapa menit sambil berharap masalah hilang sendiri setelah restart.',
               isCorrect: false,
               explanation:
-                'Menunggu pasif tidak memberi bukti baru dan tidak membantu membedakan sumber masalah jaringan.',
+                'Menunggu pasif tidak memberi bukti baru and tidak membantu membedakan sumber masalah jaringan.',
             },
           ],
         },
@@ -880,14 +721,14 @@ export const lesson1Stages: Stage[] = [
             'Langsung mengganti patch cord yang rusak tanpa memeriksa log karena data corruption terlihat paling berbahaya.',
           isOptimal: false,
           consequence:
-            'Mengganti kabel memang berpotensi mengurangi checksum error, tetapi collision burst dan packet loss pada uplink utama tetap belum terpetakan sehingga layanan masih tidak stabil.',
+            'Mengganti kabel memang berpotensi mengurangi checksum error, tetapi collision burst and packet loss pada uplink utama tetap belum terpetakan sehingga layanan masih tidak stabil.',
           followUpQuestion:
             'Jika kabel sudah diganti tetapi siaran tetap tersendat, data tambahan apa yang paling perlu diperiksa selanjutnya?',
           followUpChoices: [
             {
               id: 'f3a',
               text:
-                'Periksa log TCP dan topologi untuk membedakan collision lokal dari packet loss pada uplink utama.',
+                'Periksa log TCP and topologi untuk membedakan collision lokal dari packet loss pada uplink utama.',
               isCorrect: true,
               explanation:
                 'Langkah ini membantumu melihat bahwa masalah tidak hanya satu. Packet loss pada uplink utama harus diprioritaskan, lalu collision lokal ditangani dengan mengganti hub menjadi switch.',
@@ -898,7 +739,7 @@ export const lesson1Stages: Stage[] = [
                 'Fokus pada pergantian kabel lain secara acak sampai layanan terasa membaik.',
               isCorrect: false,
               explanation:
-                'Pergantian acak tidak sistematis dan tidak menjawab kemungkinan masalah lain seperti collision dan packet loss.',
+                'Pergantian acak tidak sistematis and tidak menjawab kemungkinan masalah lain seperti collision and packet loss.',
             },
           ],
         },

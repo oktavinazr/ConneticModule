@@ -76,7 +76,7 @@ export function createDefaultStages(lessonId: string, topic: string): Stage[] {
         { name: 'Andi', role: 'Analis', answer: 'Saya pikir kita harus fokus pada header paket.' },
         { name: 'Siti', role: 'Teknisi', answer: 'Konfigurasi IP juga perlu dicek.' }
       ],
-      groupActivity: { groupNames: ['Kelompok 1', 'Kelompok 2', 'Kelompok 3', 'Kelompok 4', 'Kelompok 5'] }
+      groupActivity: { groupNames: ['Kelompok 1', 'Kelompok 2', 'Kelompok 3', 'Kelompok 4', 'Kelompok 5', 'Kelompok 6', 'Kelompok 7', 'Kelompok 8'] }
     },
     {
       type: 'modeling',

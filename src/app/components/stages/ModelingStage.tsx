@@ -13,6 +13,10 @@ interface ModelingStep {
 
 interface ModelingStageProps {
   modelingSteps?: ModelingStep[];
+  practiceInstructions?: {
+    forTeacher: string[];
+    forStudent: string[];
+  };
   lessonId: string;
   stageIndex: number;
   onComplete: (answer: any) => void;

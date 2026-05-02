@@ -21,7 +21,7 @@ export function TcpIpInteractive() {
       case 3: return { title: 'Network Layer (PC A)', desc: 'Segmen diberi IP Header yang berisi alamat IP Sumber (PC A) dan IP Tujuan (PC B) agar router tahu arah pengirimannya.', task: 'Pengalamatan IP', action: 'Tambah' };
       case 4: return { title: 'Data Link Layer (PC A)', desc: 'Paket dibungkus menjadi Frame. Diberi MAC Address dan FCS (Frame Check Sequence) untuk mendeteksi error di media fisik.', task: 'MAC Address & Cek Error', action: 'Tambah' };
       case 5: return { title: 'Physical Layer (Media Transmisi)', desc: 'Frame diubah menjadi sinyal (listrik/cahaya/radio) dan dialirkan melalui kabel atau Wi-Fi menuju PC tujuan.', task: 'Transmisi Sinyal', action: 'Konversi' };
-      case 6: return { title: 'Data Link Layer (PC B)', desc: 'PC B menerima sinyal dan mengembalikannya jadi Frame. MAC Address dan FCS dicek. Jika aman, header Ethernet dibuang.', task: 'Verifikasi MAC & FCS', action: 'Buang' };
+      case 6: return { title: 'Data Link Layer (PC B)', desc: 'PC B menerima sinyal dan mengembalikannya jadi Frame. MAC Address and FCS dicek. Jika aman, header Ethernet dibuang.', task: 'Verifikasi MAC & FCS', action: 'Buang' };
       case 7: return { title: 'Network Layer (PC B)', desc: 'Mengecek IP Header. "Apakah IP Tujuan ini milikku?" Jika ya, paket diterima dan IP Header dibuang.', task: 'Verifikasi IP', action: 'Buang' };
       case 8: return { title: 'Transport Layer (PC B)', desc: 'Mengecek Port (Oh, ini untuk aplikasi Email!). Pecahan data disusun ulang berdasarkan Sequence Number. TCP header dibuang.', task: 'Susun Segmen & Port', action: 'Buang' };
       case 9: return { title: 'Application Layer (PC B)', desc: 'Data utuh disajikan ke aplikasi. Pengguna di PC B sekarang bisa membaca email tersebut di layarnya.', task: 'Penyajian Data', action: 'Buang' };
@@ -81,11 +81,10 @@ export function TcpIpInteractive() {
 
       <div className="grid lg:grid-cols-12 items-start">
         
-        {/* KOLOM KIRI: DIAGRAM U-SHAPE (Berdasarkan Gambar 6.3) */}
+        {/* KOLOM KIRI: DIAGRAM U-SHAPE */}
         <div className="lg:col-span-7 p-6 md:p-8 bg-white border-r border-[#D5DEEF] flex flex-col items-center">
           
-          {/* Header PC */}
-          <div className="flex w-full max-w-sm justify-between mb-6">
+          <div className="flex w-full max-sm justify-between mb-6">
             <div className={`flex flex-col items-center transition-opacity ${step >= 1 && step <= 4 ? 'opacity-100' : 'opacity-40'}`}>
               <Monitor className="w-12 h-12 text-[#395886] mb-2" />
               <span className="font-black text-[#395886]">PC A</span>
@@ -98,43 +97,33 @@ export function TcpIpInteractive() {
             </div>
           </div>
 
-          {/* Kolom Layer Vertikal */}
-          <div className="flex w-full max-w-sm justify-between relative">
+          <div className="flex w-full max-sm justify-between relative">
             
-            {/* Sisi PC A (Enkapsulasi) */}
             <div className="flex flex-col items-center gap-2 w-[40%]">
               <LayerBox name="Application" active={step === 1} type="encap" />
               <ArrowDown className={`w-5 h-5 transition-colors ${step > 1 ? 'text-[#628ECB]' : 'text-[#D5DEEF]'}`} />
-              
               <LayerBox name="Transport" active={step === 2} type="encap" />
               <ArrowDown className={`w-5 h-5 transition-colors ${step > 2 ? 'text-[#628ECB]' : 'text-[#D5DEEF]'}`} />
-              
               <LayerBox name="Network" active={step === 3} type="encap" />
               <ArrowDown className={`w-5 h-5 transition-colors ${step > 3 ? 'text-[#628ECB]' : 'text-[#D5DEEF]'}`} />
-              
               <LayerBox name="Data Link" active={step === 4} type="encap" />
               <ArrowDown className={`w-5 h-5 transition-colors ${step > 4 ? 'text-[#628ECB]' : 'text-[#D5DEEF]'}`} />
             </div>
 
-            {/* Sisi PC B (Dekapsulasi) */}
             <div className="flex flex-col items-center gap-2 w-[40%]">
               <LayerBox name="Application" active={step === 9} type="decap" />
               <ArrowUp className={`w-5 h-5 transition-colors ${step > 8 ? 'text-[#628ECB]' : 'text-[#D5DEEF]'}`} />
-              
               <LayerBox name="Transport" active={step === 8} type="decap" />
               <ArrowUp className={`w-5 h-5 transition-colors ${step > 7 ? 'text-[#628ECB]' : 'text-[#D5DEEF]'}`} />
-              
               <LayerBox name="Network" active={step === 7} type="decap" />
               <ArrowUp className={`w-5 h-5 transition-colors ${step > 6 ? 'text-[#628ECB]' : 'text-[#D5DEEF]'}`} />
-              
               <LayerBox name="Data Link" active={step === 6} type="decap" />
               <ArrowUp className={`w-5 h-5 transition-colors ${step > 5 ? 'text-[#628ECB]' : 'text-[#D5DEEF]'}`} />
             </div>
 
           </div>
 
-          {/* Layer Fisik (Menyambungkan bawah) */}
-          <div className="w-full max-w-sm mt-2">
+          <div className="w-full max-sm mt-2">
             <div className={`w-full rounded-xl border-2 py-4 text-center font-black uppercase tracking-widest transition-all duration-500 ${
               step === 5 ? 'border-[#10B981] bg-[#10B981] text-white shadow-[0_0_20px_rgba(16,185,129,0.4)] scale-105' : 'border-[#D5DEEF] bg-[#F0F3FA] text-[#395886]/60'
             }`}>
@@ -145,8 +134,8 @@ export function TcpIpInteractive() {
 
         </div>
 
-        {/* KOLOM KANAN: KONTROL & PENJELASAN */}
-        <div className="lg:col-span-5 bg-[#F8FAFD] p-6 md:p-8 flex flex-col h-full justify-center">
+        {/* KOLOM KANAN: KONTROL */}
+        <div className="lg:col-span-5 bg-[#F8FAFD] p-6 md:p-8 flex flex-col h-full justify-center min-h-[400px]">
           
           {step === 0 && (
             <div className="text-center animate-in fade-in">
@@ -163,7 +152,6 @@ export function TcpIpInteractive() {
 
           {step > 0 && step < 10 && info && (
             <div className="animate-in slide-in-from-right-4 duration-500 flex flex-col h-full">
-              
               <div className="flex items-center justify-between mb-4">
                  <span className="inline-block rounded-full bg-white border border-[#D5DEEF] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#395886]">
                    Langkah {step} dari 9
@@ -174,26 +162,21 @@ export function TcpIpInteractive() {
                    {step <= 4 ? 'ENKAPSULASI' : step === 5 ? 'TRANSMISI' : 'DEKAPSULASI'}
                  </span>
               </div>
-
               <h4 className="text-2xl font-black text-[#395886] mb-3">{info.title}</h4>
               <p className="text-sm font-medium text-[#395886]/80 leading-relaxed mb-6 bg-white p-4 rounded-xl border border-[#D5DEEF] shadow-sm">
                 {info.desc}
               </p>
-
-              {/* Status PDU Interaktif */}
               <div className="mb-8">
                 <span className="block text-[10px] font-black text-[#395886]/50 uppercase tracking-widest mb-2">Bentuk Data Saat Ini (PDU)</span>
                 <div className="w-full bg-[#E5E9F2] rounded-xl p-3 flex justify-center min-h-[60px] items-center border border-[#D5DEEF] overflow-x-auto">
                    {renderPdu()}
                 </div>
               </div>
-
               <div className="mt-auto">
                 <button onClick={nextStep} className="w-full py-4 rounded-2xl bg-[#10B981] text-white font-black shadow-lg shadow-[#10B981]/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2">
                   Lanjut ke Layer Berikutnya <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
-
             </div>
           )}
 
@@ -204,7 +187,7 @@ export function TcpIpInteractive() {
               </div>
               <h4 className="text-2xl font-black text-[#395886] mb-2">Transmisi Berhasil!</h4>
               <p className="text-sm font-medium text-[#395886]/70 mb-8">
-                Data telah berhasil melintasi 5 Layer Model TCP/IP (Update) dari PC A ke PC B dengan utuh.
+                Data telah berhasil melintasi 5 Layer Model TCP/IP dari PC A ke PC B dengan utuh.
               </p>
               <button onClick={reset} className="w-full py-4 rounded-2xl bg-white border-2 border-[#D5DEEF] text-[#395886] font-black hover:bg-gray-50 active:scale-95 transition-all flex items-center justify-center gap-2">
                 <RotateCcw className="w-5 h-5" /> Ulangi Simulasi
