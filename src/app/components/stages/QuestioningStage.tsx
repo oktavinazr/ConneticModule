@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { getCurrentUser } from '../../utils/auth';
 import { getLessonProgress, saveStageAttempt } from '../../utils/progress';
+import { useActivityTracker } from '../../hooks/useActivityTracker';
 
 // -- Interfaces -----------------------------------------------------------------
 
@@ -508,9 +509,49 @@ function ArgumentativeReflection({ onDone }: { onDone: (essay: string) => void }
 // -- Lesson 1 Questioning (Pizza Analogy) ---------------------------------------
 
 function QuestioningLesson1({ lessonId, stageIndex, onComplete }: QuestioningStageProps) {
+  const tracker = useActivityTracker({
+    lessonId,
+    stageIndex,
+    stageType: 'questioning',
+  });
   const [subPhase, setSubPhase] = useState<'map' | 'simulation' | 'essay'>('map');
   const [selections, setPlacements] = useState<Record<string, string>>({});
   const [essay, setEssay] = useState('');
+  const [isRestored, setIsRestored] = useState(false);
+
+  useEffect(() => {
+    if (!tracker.isLoading && tracker.session?.latestSnapshot && !isRestored) {
+      const snap = tracker.session.latestSnapshot;
+      if (snap.subPhase) setSubPhase(snap.subPhase);
+      if (snap.selections) setPlacements(snap.selections);
+      if (snap.essay) setEssay(snap.essay);
+      setIsRestored(true);
+    } else if (!tracker.isLoading) {
+      setIsRestored(true);
+    }
+  }, [tracker.isLoading, tracker.session, isRestored]);
+
+  useEffect(() => {
+    if (!isRestored) return;
+    const progressMap = { map: 15, simulation: 55, essay: 85 } as const;
+    void tracker.saveSnapshot(
+      {
+        subPhase,
+        selections,
+        essay,
+      },
+      { progressPercent: progressMap[subPhase] },
+    );
+  }, [essay, isRestored, selections, subPhase, tracker]);
+
+  if (tracker.isLoading || !isRestored) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <div className="w-12 h-12 border-4 border-[#8B5CF6] border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-bold text-[#395886]">Memuat progres...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-10 pb-12">
@@ -542,7 +583,7 @@ function QuestioningLesson1({ lessonId, stageIndex, onComplete }: QuestioningSta
         <div className="space-y-8 animate-in fade-in duration-700">
           <PizzaLayerMap />
           <button 
-            onClick={() => setSubPhase('simulation')}
+            onClick={() => { void tracker.trackEvent('questioning_map_completed', {}, { progressPercent: 35 }); setSubPhase('simulation'); }}
             className="w-full py-5 rounded-[2rem] bg-[#8B5CF6] text-white font-black text-sm hover:bg-[#7C3AED] shadow-xl shadow-purple-200 transition-all active:scale-95 flex items-center justify-center gap-3"
           >
             Lanjut ke Simulasi Gangguan
@@ -564,7 +605,7 @@ function QuestioningLesson1({ lessonId, stageIndex, onComplete }: QuestioningSta
           <DisruptionSimulation
             lessonId={lessonId}
             stageIndex={stageIndex}
-            onComplete={(ans) => { setPlacements(ans); setSubPhase('essay'); }}
+            onComplete={(ans) => { setPlacements(ans); void tracker.trackEvent('questioning_simulation_completed', { answerCount: Object.keys(ans ?? {}).length }, { progressPercent: 75 }); setSubPhase('essay'); }}
           />
         </div>
       )}
@@ -573,7 +614,9 @@ function QuestioningLesson1({ lessonId, stageIndex, onComplete }: QuestioningSta
         <div className="animate-in zoom-in-95 duration-500">
           <ArgumentativeReflection onDone={(text) => {
             setEssay(text);
-            onComplete({ selectedId: 'disruption_simulation', isCorrect: true, askedQuestions: [], justification: text });
+            const finalAnswer = { selectedId: 'disruption_simulation', isCorrect: true, askedQuestions: [], justification: text };
+            void tracker.complete(finalAnswer, { subPhase: 'essay', selections, essay: text, finalAnswer });
+            onComplete(finalAnswer);
           }} />
         </div>
       )}
@@ -587,20 +630,58 @@ function QuestioningOriginal({
   scenario, whyQuestion, reasonOptions = [], lessonId, stageIndex, onComplete, problemVisual, teacherQuestion, questionBank = []
 }: QuestioningStageProps) {
   const user = getCurrentUser();
+  const tracker = useActivityTracker({
+    lessonId,
+    stageIndex,
+    stageType: 'questioning',
+  });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [justification, setJustification] = useState('');
   const [validated, setValidated] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [askedQuestions, setAskedQuestions] = useState<string[]>([]);
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const [isRestored, setIsRestored] = useState(false);
 
   useEffect(() => {
     getLessonProgress(user!.id, lessonId).then(p => setAttempts(p.stageAttempts[`stage_${stageIndex}`] || 0));
   }, []);
 
+  useEffect(() => {
+    if (!tracker.isLoading && tracker.session?.latestSnapshot && !isRestored) {
+      const snap = tracker.session.latestSnapshot;
+      if (snap.selectedId) setSelectedId(snap.selectedId);
+      if (snap.justification) setJustification(snap.justification);
+      if (snap.validated) setValidated(snap.validated);
+      if (snap.askedQuestions) setAskedQuestions(snap.askedQuestions);
+      if (snap.activeQuestionId) setActiveQuestionId(snap.activeQuestionId);
+      setIsRestored(true);
+    } else if (!tracker.isLoading) {
+      setIsRestored(true);
+    }
+  }, [tracker.isLoading, tracker.session, isRestored]);
+
+  const isCorrect = reasonOptions.find(o => o.id === selectedId)?.isCorrect ?? false;
+
+  useEffect(() => {
+    if (!isRestored) return;
+    void tracker.saveSnapshot(
+      {
+        selectedId,
+        justification,
+        validated,
+        attempts,
+        askedQuestions,
+        activeQuestionId,
+      },
+      { progressPercent: validated ? (isCorrect || attempts >= 3 ? 85 : 60) : selectedId ? 30 : 10 },
+    );
+  }, [activeQuestionId, askedQuestions, attempts, isCorrect, isRestored, justification, selectedId, tracker, validated]);
+
   const handleQuestionClick = (qId: string) => {
     setActiveQuestionId(qId);
     if (!askedQuestions.includes(qId)) setAskedQuestions([...askedQuestions, qId]);
+    void tracker.trackEvent('question_opened', { questionId: qId }, { progressPercent: 20 });
   };
 
   const handleValidate = async () => {
@@ -608,10 +689,19 @@ function QuestioningOriginal({
     const ok = reasonOptions.find(o => o.id === selectedId)?.isCorrect ?? false;
     const newA = await saveStageAttempt(user!.id, lessonId, stageIndex, ok);
     setAttempts(newA); setValidated(true);
+    void tracker.trackEvent('questioning_validation', { selectedId }, { isCorrect: ok, progressPercent: ok ? 70 : 55 });
   };
 
   const activeResponse = questionBank?.find(q => q.id === activeQuestionId)?.response;
-  const isCorrect = reasonOptions.find(o => o.id === selectedId)?.isCorrect ?? false;
+
+  if (tracker.isLoading || !isRestored) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <div className="w-12 h-12 border-4 border-[#628ECB] border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-bold text-[#395886]">Memuat progres...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -657,7 +747,7 @@ function QuestioningOriginal({
           <div className="space-y-4 animate-in fade-in">
              <label className="block text-xs font-bold text-[#395886]">Berikan alasan logismu:</label>
              <textarea value={justification} onChange={e => setJustification(e.target.value)} rows={3} className="w-full p-4 rounded-xl border-2 border-[#D5DEEF] text-xs font-medium focus:border-[#628ECB] outline-none" placeholder="Tuliskan alasan teknismu..." />
-             <button onClick={() => onComplete({ selectedId: selectedId!, isCorrect, askedQuestions, justification })} disabled={justification.length < 10} className="w-full py-3 bg-[#628ECB] text-white rounded-xl font-bold text-sm hover:bg-[#395886] transition-all">Selesaikan Tahapan</button>
+             <button onClick={() => { const finalAnswer = { selectedId: selectedId!, isCorrect, askedQuestions, justification }; void tracker.complete(finalAnswer, { finalAnswer, selectedId, askedQuestions, justification }); onComplete(finalAnswer); }} disabled={justification.length < 10} className="w-full py-3 bg-[#628ECB] text-white rounded-xl font-bold text-sm hover:bg-[#395886] transition-all">Selesaikan Tahapan</button>
           </div>
         )}
 

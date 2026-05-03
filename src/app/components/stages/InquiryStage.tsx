@@ -8,6 +8,7 @@ import { useDrag, useDrop } from 'react-dnd';
 import { getCurrentUser } from '../../utils/auth';
 import { getLessonProgress, saveStageAttempt } from '../../utils/progress';
 import { Ipv4Analyzer } from '../ui/Ipv4Analyzer';
+import { useActivityTracker } from '../../hooks/useActivityTracker';
 
 // -- Types ----------------------------------------------------------------------
 
@@ -169,12 +170,15 @@ function FlowDropSlot({ position, placedItem, validated, isCorrect, onDrop }: {
 
 // -- Shared UI Sub-components --------------------------------------------------
 
-function DragDropLayerSorter({ flowItems, flowInstruction, lessonId, stageIndex, onComplete }: {
-  flowItems: FlowItem[]; flowInstruction?: string; lessonId: string; stageIndex: number; onComplete: () => void;
+function DragDropLayerSorter({ flowItems, flowInstruction, lessonId, stageIndex, onComplete, onNext, initialData }: {
+  flowItems: FlowItem[]; flowInstruction?: string; lessonId: string; stageIndex: number; 
+  onComplete: (currentSlots?: Record<number, string>) => void;
+  onNext?: () => void;
+  initialData?: { slots?: Record<number, string>; validated?: boolean };
 }) {
   const user = getCurrentUser();
-  const [slots, setSlots] = useState<Record<number, string>>({});
-  const [validated, setValidated] = useState(false);
+  const [slots, setSlots] = useState<Record<number, string>>(initialData?.slots || {});
+  const [validated, setValidated] = useState(initialData?.validated || false);
   const [attempts, setAttempts] = useState(0);
   const [shuffledPool] = useState<FlowItem[]>(() => {
     const arr = [...flowItems];
@@ -191,12 +195,18 @@ function DragDropLayerSorter({ flowItems, flowInstruction, lessonId, stageIndex,
     );
   }, []);
 
+  useEffect(() => {
+    if (initialData?.slots) setSlots(initialData.slots);
+    if (initialData?.validated) setValidated(initialData.validated);
+  }, [initialData]);
+
   const handleDrop = (pos: number, id: string) => {
     if (validated) return;
     setSlots(prev => {
       const next = { ...prev };
       (Object.keys(next) as unknown as number[]).forEach(k => { if (next[Number(k)] === id) delete next[Number(k)]; });
       next[pos] = id;
+      onComplete(next);
       return next;
     });
   };
@@ -206,8 +216,7 @@ function DragDropLayerSorter({ flowItems, flowInstruction, lessonId, stageIndex,
   const allPlaced = placedIds.size === flowItems.length;
 
   const isCorrectOrder = allPlaced && flowItems.every(item => {
-    const pos = Number(Object.keys(slots).find(k => slots[Number(k)] === item.id));
-    return pos === item.correctOrder;
+    return slots[item.correctOrder] === item.id;
   });
 
   const handleValidate = async () => {
@@ -215,9 +224,10 @@ function DragDropLayerSorter({ flowItems, flowInstruction, lessonId, stageIndex,
     const newA = await saveStageAttempt(user!.id, lessonId, stageIndex, ok, `stage_${stageIndex}_flow`);
     setAttempts(newA);
     setValidated(true);
+    onComplete(slots);
   };
 
-  const handleRetry = () => { setValidated(false); setSlots({}); };
+  const handleRetry = () => { setValidated(false); setSlots({}); onComplete({}); };
   const isDone = validated && (isCorrectOrder || attempts >= 3);
 
   return (
@@ -264,7 +274,7 @@ function DragDropLayerSorter({ flowItems, flowInstruction, lessonId, stageIndex,
             Periksa Susunan
           </button>
         ) : isDone ? (
-          <button onClick={onComplete} className="w-full py-3 rounded-xl bg-[#628ECB] text-white font-bold text-sm">Lanjut</button>
+          <button onClick={onNext || (() => onComplete(slots))} className="w-full py-3 rounded-xl bg-[#628ECB] text-white font-bold text-sm">Lanjut</button>
         ) : (
            <button onClick={handleRetry} className="w-full py-3 rounded-xl bg-red-50 text-red-600 font-bold text-sm">Coba Lagi</button>
         )}
@@ -302,15 +312,16 @@ function InlineReflectionBox({ prompt, label = 'Refleksi Pemahaman', onDone }: {
 
 // -- Matching Phase -----------------------------------------------------------
 
-function MatchingPhase({ pairs, lessonId, stageIndex, onComplete, shuffleRight, completeLabel }: {
+function MatchingPhase({ pairs, lessonId, stageIndex, onComplete, shuffleRight, completeLabel, initialData }: {
   pairs: MatchingPair[]; lessonId: string; stageIndex: number;
   onComplete: (matches: Record<string, string>) => void;
   shuffleRight?: boolean; completeLabel?: string;
+  initialData?: { matches?: Record<string, string>; validated?: boolean };
 }) {
   const user = getCurrentUser();
   const [selectedLeft, setSelectedLeft] = useState<string | null>(null);
-  const [matches, setMatches] = useState<Record<string, string>>({});
-  const [validated, setValidated] = useState(false);
+  const [matches, setMatches] = useState<Record<string, string>>(initialData?.matches || {});
+  const [validated, setValidated] = useState(initialData?.validated || false);
   const [attempts, setAttempts] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const leftRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -333,6 +344,11 @@ function MatchingPhase({ pairs, lessonId, stageIndex, onComplete, shuffleRight, 
   }, []);
 
   useEffect(() => {
+    if (initialData?.matches) setMatches(initialData.matches);
+    if (initialData?.validated) setValidated(initialData.validated);
+  }, [initialData]);
+
+  useEffect(() => {
     const handler = () => forceUpdate({});
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
@@ -346,6 +362,7 @@ function MatchingPhase({ pairs, lessonId, stageIndex, onComplete, shuffleRight, 
       const oldLeft = Object.keys(next).find(k => next[k] === right);
       if (oldLeft) delete next[oldLeft];
       next[selectedLeft] = right;
+      onComplete(next);
       return next;
     });
     setSelectedLeft(null);
@@ -358,9 +375,10 @@ function MatchingPhase({ pairs, lessonId, stageIndex, onComplete, shuffleRight, 
     const newA = await saveStageAttempt(user!.id, lessonId, stageIndex, ok, `stage_${stageIndex}_matching`);
     setAttempts(newA);
     setValidated(true);
+    onComplete(matches);
   };
 
-  const handleRetry = () => { setValidated(false); setMatches({}); setSelectedLeft(null); };
+  const handleRetry = () => { setValidated(false); setMatches({}); setSelectedLeft(null); onComplete({}); };
 
   const allMatched = Object.keys(matches).length === pairs.length;
 
@@ -727,12 +745,38 @@ function MaterialViewer({ material, onNext }: { material: InquiryStageProps['mat
 
 function InquiryLesson1Page(props: InquiryStageProps) {
   const { material, explorationSections, flowItems, flowInstruction, matchingPairs, inquiryReflection1, inquiryReflection2, lessonId, stageIndex, onComplete, isCompleted } = props;
-  const [phase, setPhase] = useState<'material' | 'explore' | 'activities'>('material');
-  const [activityStep, setActivityStep] = useState<number>(1); // 1: X.TCP.3, 2: Refleksi 1, 3: X.TCP.4, 4: Refleksi 2
+  const tracker = useActivityTracker({ lessonId, stageIndex, stageType: 'inquiry' });
 
+  const [phase, setPhase] = useState<'material' | 'explore' | 'activities'>('material');
+  const [activityStep, setActivityStep] = useState<number>(1);
   const [reflection1, setReflection1] = useState('');
   const [matchingAnswers, setMatchingAnswers] = useState<Record<string, string>>({});
   const [reflection2, setReflection2] = useState('');
+  const [flowData, setFlowData] = useState<any>(null);
+  const [isRestored, setIsRestored] = useState(false);
+
+  useEffect(() => {
+    if (!tracker.isLoading && tracker.session?.latestSnapshot && !isRestored) {
+      const snap = tracker.session.latestSnapshot;
+      if (snap.phase) setPhase(snap.phase);
+      if (snap.activityStep) setActivityStep(snap.activityStep);
+      if (snap.reflection1) setReflection1(snap.reflection1);
+      if (snap.matchingAnswers) setMatchingAnswers(snap.matchingAnswers);
+      if (snap.reflection2) setReflection2(snap.reflection2);
+      if (snap.flowData) setFlowData(snap.flowData);
+      setIsRestored(true);
+    } else if (!tracker.isLoading) {
+      setIsRestored(true);
+    }
+  }, [tracker.isLoading, tracker.session, isRestored]);
+
+  useEffect(() => {
+    if (!isRestored) return;
+    const progressMap = { material: 10, explore: 30, activities: 50 + (activityStep * 10) } as const;
+    void tracker.saveSnapshot({
+      phase, activityStep, reflection1, matchingAnswers, reflection2, flowData,
+    }, { progressPercent: progressMap[phase] });
+  }, [activityStep, flowData, isRestored, matchingAnswers, phase, reflection1, reflection2, tracker]);
 
   if (isCompleted) return (
     <div className="flex justify-center py-8">
@@ -742,8 +786,15 @@ function InquiryLesson1Page(props: InquiryStageProps) {
     </div>
   );
 
-  if (phase === 'material') return <MaterialViewer material={material} onNext={() => setPhase('explore')} />;
-  if (phase === 'explore') return <ExplorePhase explorationSections={explorationSections ?? []} onNext={() => setPhase('activities')} />;
+  if (tracker.isLoading || !isRestored) return (
+    <div className="flex flex-col items-center justify-center py-20 space-y-4">
+      <div className="w-12 h-12 border-4 border-[#10B981] border-t-transparent rounded-full animate-spin" />
+      <p className="text-sm font-bold text-[#395886]">Memuat progres...</p>
+    </div>
+  );
+
+  if (phase === 'material') return <MaterialViewer material={material} onNext={() => { void tracker.trackEvent('inquiry_material_viewed', {}, { progressPercent: 20 }); setPhase('explore'); }} />;
+  if (phase === 'explore') return <ExplorePhase explorationSections={explorationSections ?? []} onNext={() => { void tracker.trackEvent('inquiry_exploration_completed', {}, { progressPercent: 40 }); setPhase('activities'); }} />;
 
   // phase === 'activities'
   return (
@@ -754,7 +805,9 @@ function InquiryLesson1Page(props: InquiryStageProps) {
           flowInstruction={flowInstruction}
           lessonId={lessonId}
           stageIndex={stageIndex}
-          onComplete={() => setActivityStep(2)}
+          initialData={flowData}
+          onComplete={(slots) => setFlowData({ slots })}
+          onNext={() => { setFlowData(prev => ({ ...prev, validated: true })); setActivityStep(2); }}
         />
       )}
 
@@ -800,14 +853,64 @@ function InquiryLesson1Page(props: InquiryStageProps) {
 // -- Main InquiryStage Router --------------------------------------------------
 
 export function InquiryStage(props: InquiryStageProps) {
-  if (props.lessonId === '1') return <InquiryLesson1Page {...props} />;
+  const { lessonId, stageIndex, onComplete } = props;
+  const tracker = useActivityTracker({
+    lessonId,
+    stageIndex,
+    stageType: 'inquiry',
+  });
+
+  if (lessonId === '1') return <InquiryLesson1Page {...props} />;
   
-  // Dynamic Phase Router for other lessons
   const [phase, setPhase] = useState<'material' | 'explore' | 'analyzer' | 'activities'>('material');
   const [subPhase, setSubPhase] = useState<'flow' | 'group' | 'matching'>('flow');
+  const [flowData, setFlowData] = useState<any>(null);
+  const [groupData, setGroupData] = useState<any>(null);
+  const [matchingData, setMatchingData] = useState<any>(null);
+  const [isRestored, setIsRestored] = useState(false);
 
-  if (phase === 'material') return <MaterialViewer material={props.material} onNext={() => setPhase('explore')} />;
+  useEffect(() => {
+    if (!tracker.isLoading && tracker.session?.latestSnapshot && !isRestored) {
+      const snap = tracker.session.latestSnapshot;
+      if (snap.phase) setPhase(snap.phase);
+      if (snap.subPhase) setSubPhase(snap.subPhase);
+      if (snap.flowData) setFlowData(snap.flowData);
+      if (snap.groupData) setGroupData(snap.groupData);
+      if (snap.matchingData) setMatchingData(snap.matchingData);
+      setIsRestored(true);
+    } else if (!tracker.isLoading) {
+      setIsRestored(true);
+    }
+  }, [tracker.isLoading, tracker.session, isRestored]);
+
+  useEffect(() => {
+    if (!isRestored) return;
+    const progressMap = { material: 10, explore: 30, analyzer: 45, activities: 65 } as const;
+    void tracker.saveSnapshot(
+      {
+        phase,
+        subPhase,
+        flowData,
+        groupData,
+        matchingData,
+        hasFlow: !!props.flowItems?.length,
+        hasGroup: !!props.groupItems?.length,
+        hasMatching: !!props.matchingPairs?.length,
+      },
+      { progressPercent: progressMap[phase] + (phase === 'activities' ? (subPhase === 'flow' ? 0 : subPhase === 'group' ? 10 : 20) : 0) },
+    );
+  }, [flowData, groupData, isRestored, matchingData, phase, props.flowItems?.length, props.groupItems?.length, props.matchingPairs?.length, subPhase, tracker]);
+
+  if (tracker.isLoading || !isRestored) return (
+    <div className="flex flex-col items-center justify-center py-20 space-y-4">
+      <div className="w-12 h-12 border-4 border-[#10B981] border-t-transparent rounded-full animate-spin" />
+      <p className="text-sm font-bold text-[#395886]">Memuat progres...</p>
+    </div>
+  );
+
+  if (phase === 'material') return <MaterialViewer material={props.material} onNext={() => { void tracker.trackEvent('inquiry_material_viewed', {}, { progressPercent: 20 }); setPhase('explore'); }} />;
   if (phase === 'explore') return <ExplorePhase explorationSections={props.explorationSections ?? []} onNext={() => {
+    void tracker.trackEvent('inquiry_exploration_completed', { sectionCount: props.explorationSections?.length ?? 0 }, { progressPercent: 40 });
     if (props.lessonId === '3') setPhase('analyzer');
     else {
       setPhase('activities');
@@ -824,6 +927,7 @@ export function InquiryStage(props: InquiryStageProps) {
          <div className="max-w-4xl mx-auto flex justify-center">
             <button 
               onClick={() => {
+                void tracker.trackEvent('inquiry_analyzer_completed', {}, { progressPercent: 55 });
                 setPhase('activities');
                 if (props.flowItems) setSubPhase('flow');
                 else if (props.groups) setSubPhase('group');
@@ -839,16 +943,33 @@ export function InquiryStage(props: InquiryStageProps) {
   }
 
   if (phase === 'activities') {
-    if (subPhase === 'flow' && props.flowItems) return <DragDropLayerSorter flowItems={props.flowItems} lessonId={props.lessonId} stageIndex={props.stageIndex} onComplete={() => {
+    if (subPhase === 'flow' && props.flowItems) return <DragDropLayerSorter flowItems={props.flowItems} lessonId={props.lessonId} stageIndex={props.stageIndex} initialData={flowData} onComplete={(slots) => setFlowData({ slots })} onNext={() => {
+       setFlowData(prev => ({ ...prev, validated: true }));
+       void tracker.trackEvent('inquiry_flow_completed', {}, { progressPercent: 72 });
        if (props.groups) setSubPhase('group');
        else if (props.matchingPairs) setSubPhase('matching');
-       else props.onComplete({});
+       else {
+         const finalAnswer = { flowData: { ...flowData, validated: true } };
+         void tracker.complete(finalAnswer, { phase: 'activities', subPhase: 'flow', finalAnswer });
+         onComplete(finalAnswer);
+       }
     }} />;
-    if (subPhase === 'group' && props.groups && props.groupItems) return <GroupingPhase groups={props.groups} items={props.groupItems} lessonId={props.lessonId} stageIndex={props.stageIndex} onComplete={() => {
+    if (subPhase === 'group' && props.groups && props.groupItems) return <GroupingPhase groups={props.groups} items={props.groupItems} lessonId={props.lessonId} stageIndex={props.stageIndex} initialData={groupData} onComplete={(placement) => setGroupData({ placement })} onNext={() => {
+       setGroupData(prev => ({ ...prev, validated: true }));
+       void tracker.trackEvent('inquiry_grouping_completed', {}, { progressPercent: 85 });
        if (props.matchingPairs) setSubPhase('matching');
-       else props.onComplete({});
+       else {
+         const finalAnswer = { flowData, groupData: { ...groupData, validated: true } };
+         void tracker.complete(finalAnswer, { phase: 'activities', subPhase: 'group', finalAnswer });
+         onComplete(finalAnswer);
+       }
     }} />;
-    if (subPhase === 'matching' && props.matchingPairs) return <MatchingPhase pairs={props.matchingPairs} lessonId={props.lessonId} stageIndex={props.stageIndex} onComplete={props.onComplete} />;
+    if (subPhase === 'matching' && props.matchingPairs) return <MatchingPhase pairs={props.matchingPairs} lessonId={props.lessonId} stageIndex={props.stageIndex} initialData={matchingData} onComplete={(matches) => { 
+       setMatchingData({ matches, validated: true });
+       const finalAnswer = { flowData, groupData, matchingData: { matches, validated: true } };
+       void tracker.complete(finalAnswer, { phase: 'activities', subPhase: 'matching', finalAnswer }); 
+       onComplete(finalAnswer); 
+    }} />;
   }
 
   return null;

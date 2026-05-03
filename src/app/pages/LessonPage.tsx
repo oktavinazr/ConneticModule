@@ -309,6 +309,7 @@ export function LessonPage() {
   if (!lesson || currentStageIndex === null) return null;
 
   const currentStage = lesson.stages[currentStageIndex];
+  const currentStageAnswer = progress.answers[`stage_${currentStageIndex}`] ?? progress.answers[currentStageIndex];
   const isLastStage = currentStageIndex === lesson.stages.length - 1;
   const guide = stageGuides[currentStage.type as StageType];
   const displayTitle = getStageDisplayTitle(currentStage.type);
@@ -683,26 +684,26 @@ export function LessonPage() {
                 </div>
               </div>
 
-              {progress.answers[currentStageIndex] && (
+              {currentStageAnswer && (
                 <div className="bg-white rounded-2xl border-2 border-[#D5DEEF] shadow-sm overflow-hidden">
                   <div className="flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-[#628ECB]/8 to-transparent border-b border-[#628ECB]/10">
                     <Eye className="w-4 h-4 text-[#628ECB]" />
                     <p className="text-xs font-bold text-[#395886]">Ringkasan Jawaban Kamu</p>
                   </div>
                   <div className="p-5">
-                    <StageAnswerDetail stage={currentStage} answer={progress.answers[currentStageIndex]} />
+                    <StageAnswerDetail stage={currentStage} answer={currentStageAnswer} />
                   </div>
                 </div>
               )}
 
-              {(progress.answers[currentStageIndex] as any)?.reflection && (
+              {(currentStageAnswer as any)?.reflection && (
                 <div className="bg-white rounded-2xl border-2 border-[#628ECB]/20 shadow-sm overflow-hidden">
                   <div className="flex items-center gap-3 px-5 py-3 bg-[#628ECB]/5 border-b border-[#628ECB]/10">
                     <Eye className="w-4 h-4 text-[#628ECB]" />
                     <p className="text-xs font-bold text-[#395886]">Refleksi Mandiri Kamu</p>
                   </div>
                   <div className="p-5">
-                    <p className="text-sm text-[#395886] leading-relaxed">{(progress.answers[currentStageIndex] as any).reflection}</p>
+                    <p className="text-sm text-[#395886] leading-relaxed">{(currentStageAnswer as any).reflection}</p>
                   </div>
                 </div>
               )}

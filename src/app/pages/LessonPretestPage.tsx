@@ -14,8 +14,6 @@ export function LessonPretestPage() {
   const [user] = useState(getCurrentUser);
   const lesson = lessonId ? lessons[lessonId] : null;
 
-  const [testActive, setTestActive] = useState(false);
-
   const [progress, setProgress] = useState<LessonProgress>({
     lessonId: lessonId ?? '',
     userId: user?.id ?? '',
@@ -94,10 +92,10 @@ export function LessonPretestPage() {
     ? progress.answers.pretest
     : undefined;
 
-  const lessonFlow = useState(() => ({
+  const lessonFlow = {
     step: 2,
     lessonId: lessonId!,
-  }))[0];
+  };
 
   return (
     <TestPage
@@ -110,7 +108,6 @@ export function LessonPretestPage() {
       existingAnswers={existingAnswers}
       existingScore={progress.pretestScore}
       duration={5}
-      onStart={() => setTestActive(true)}
       isLessonPretest={true}
       lessonFlow={{
         ...lessonFlow,

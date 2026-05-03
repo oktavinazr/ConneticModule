@@ -48,6 +48,7 @@ import { addAdminGroupName, assignGroup, deleteAdminGroupName, getAdminGroupName
 import { lessons, globalPretest, globalPosttest, type Stage } from '../data/lessons';
 import { getAllStudents, logout, getCurrentUser, resetStudentPassword } from '../utils/auth';
 import { getAllProgress, getGlobalTestProgress, getLessonProgress } from '../utils/progress';
+import { getLessonActivitySessions, getStudentActivityFeed, type CTLActivityEvent, type CTLActivitySession } from '../utils/activityTracking';
 import { Header } from '../components/layout/Header';
 import { EditLearningSection } from '../components/admin/EditLearningSection';
 import { StageAnswerDetail, getStageAnswerSummary, CTL_META } from '../components/admin/StageDetail';
@@ -81,6 +82,7 @@ interface LessonSummary {
   completedStages: number[];
   totalStages: number;
   stageAnswers: Record<string, any>;
+  stageTracking: Record<string, CTLActivitySession>;
 }
 
 interface StudentActivitySummary {
@@ -435,8 +437,12 @@ function StudentDetailModal({ activity, onClose }: { activity: StudentActivitySu
                         <tbody className="divide-y divide-[#D5DEEF]">
                           {ld.stages.map((stage, si) => {
                             const done = lesson.completedStages.includes(si);
-                            const stageAnswer = lesson.stageAnswers[`stage_${si}`];
+                            const stageAnswer = lesson.stageAnswers[`stage_${si}`] ?? lesson.stageAnswers[si];
+                            const tracking = lesson.stageTracking[`stage_${si}`];
                             const meta = CTL_META[stage.type] ?? CTL_META.constructivism;
+                            const displayAnswer = stageAnswer || tracking?.latestSnapshot;
+                            const hasStarted = !!tracking;
+
                             return (
                               <tr key={si} className={done ? 'bg-white' : 'bg-[#F8FAFD]'}>
                                 <td className="px-4 py-3 text-xs font-bold text-[#395886]/40">{si + 1}</td>
@@ -451,17 +457,35 @@ function StudentDetailModal({ activity, onClose }: { activity: StudentActivitySu
                                     <span className="inline-flex items-center gap-1 text-xs font-bold text-[#10B981]">
                                       <CheckCircle className="w-3.5 h-3.5" /> Selesai
                                     </span>
+                                  ) : hasStarted ? (
+                                    <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-500">
+                                      <RefreshCw className="w-3 h-3 animate-spin" /> Sedang Berjalan
+                                    </span>
                                   ) : (
                                     <span className="text-xs font-bold text-[#395886]/30">Belum</span>
                                   )}
                                 </td>
                                 <td className="px-4 py-3">
-                                  {done ? (
-                                    <div className="group relative">
-                                      <div className="max-h-20 overflow-hidden text-xs text-[#395886]/70 leading-relaxed">
-                                        <StageAnswerDetail stage={stage} answer={stageAnswer} />
+                                  {displayAnswer ? (
+                                    <div className="space-y-2">
+                                      <div className="max-h-24 overflow-hidden text-xs text-[#395886]/70 leading-relaxed">
+                                        <StageAnswerDetail stage={stage} answer={displayAnswer} />
                                       </div>
-                                      <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-white to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                      {tracking && (
+                                        <div className="flex flex-wrap gap-2">
+                                          <span className="rounded-full bg-[#F0F3FA] px-2 py-1 text-[10px] font-bold text-[#395886]">
+                                            Progres {tracking.progressPercent}%
+                                          </span>
+                                          <span className="rounded-full bg-[#F0F3FA] px-2 py-1 text-[10px] font-bold text-[#395886]">
+                                            {tracking.totalAttempts} Percobaan
+                                          </span>
+                                          {tracking.totalErrors > 0 && (
+                                            <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-500">
+                                              {tracking.totalErrors} Salah
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   ) : (
                                     <span className="text-xs text-[#395886]/30 italic">—</span>
@@ -605,6 +629,7 @@ export function AdminPage() {
   const [students, setStudents] = useState<Awaited<ReturnType<typeof getAllStudents>>>([]);
   const [studentActivities, setStudentActivities] = useState<StudentActivitySummary[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [activityFeed, setActivityFeed] = useState<CTLActivityEvent[]>([]);
 
   // ── Group Management State ──────────────────────────────────────────────────
   const [groupAssignmentsAdmin, setGroupAssignmentsAdmin] = useState<Record<string, string>>({});
@@ -736,7 +761,10 @@ export function AdminPage() {
 
         const lessonsData: LessonSummary[] = await Promise.all(
           Object.values(lessons).map(async lesson => {
-            const lp = await getLessonProgress(student.id, lesson.id);
+            const [lp, tracking] = await Promise.all([
+              getLessonProgress(student.id, lesson.id),
+              getLessonActivitySessions(student.id, lesson.id),
+            ]);
             return {
               lessonId: lesson.id,
               lessonTitle: lesson.title,
@@ -750,6 +778,7 @@ export function AdminPage() {
               completedStages: lp.completedStages,
               totalStages: lesson.stages.length,
               stageAnswers: lp.answers,
+              stageTracking: Object.fromEntries(tracking.map((session) => [`stage_${session.stageIndex}`, session])),
             };
           })
         );
@@ -781,6 +810,13 @@ export function AdminPage() {
       })
     ).then(setStudentActivities);
   }, [students]);
+
+  useEffect(() => {
+    const refreshFeed = () => getStudentActivityFeed(30).then(setActivityFeed);
+    refreshFeed();
+    const interval = setInterval(refreshFeed, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Stats
   const totalStudents = studentActivities.length;
@@ -1223,6 +1259,41 @@ export function AdminPage() {
                       <div className="px-6 py-8 text-center">
                         <p className="text-sm text-[#395886]/40">Belum ada data siswa.</p>
                       </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-[#D5DEEF] shadow-sm overflow-hidden">
+                  <div className="px-6 py-4 border-b border-[#D5DEEF] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-[#395886]">Aktivitas CTL Terkini</h3>
+                      <button 
+                        onClick={() => getStudentActivityFeed(30).then(setActivityFeed)}
+                        className="p-1.5 rounded-lg hover:bg-[#F0F3FA] text-[#628ECB] transition-colors"
+                        title="Segarkan Aktivitas"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <span className="text-xs font-bold bg-[#10B981]/10 text-[#10B981] px-2.5 py-1 rounded-full">Realtime Feed</span>
+                  </div>
+                  <div className="divide-y divide-[#D5DEEF]">
+                    {activityFeed.slice(0, 8).map((event) => (
+                      <div key={event.id} className="px-6 py-3.5 flex items-center justify-between gap-4 hover:bg-[#F8FAFD] transition-colors">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-[#395886] truncate">
+                            Siswa `{event.userId.slice(0, 8)}` • Pertemuan {event.lessonId} • Tahap {event.stageIndex + 1}
+                          </p>
+                          <p className="text-xs text-[#395886]/50">{event.stageType} • {event.eventType}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-xs font-bold text-[#628ECB]">{event.progressPercent ?? 0}%</p>
+                          <p className="text-[10px] text-[#395886]/40">{event.createdAt ? new Date(event.createdAt).toLocaleString('id-ID') : '—'}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {activityFeed.length === 0 && (
+                      <div className="px-6 py-8 text-sm text-[#395886]/35 text-center">Belum ada aktivitas CTL yang tercatat.</div>
                     )}
                   </div>
                 </div>

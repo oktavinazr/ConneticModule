@@ -6,6 +6,7 @@ import {
   AlertCircle, MessageSquare, Activity, GripVertical,
   Cable, Wifi, Radio, Lock,
 } from 'lucide-react';
+import { useActivityTracker } from '../../hooks/useActivityTracker';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -151,12 +152,19 @@ function DataDropZone({ onDrop, isDropped, message }: { onDrop: () => void; isDr
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function ModelingStage({
+  lessonId,
+  stageIndex,
   onComplete,
   title = 'Laboratorium Virtual TCP/IP',
   description,
   objectiveCode = 'X.TCP.8',
   activityNumber,
 }: ModelingStageProps) {
+  const tracker = useActivityTracker({
+    lessonId,
+    stageIndex,
+    stageType: 'modeling',
+  });
   const [showIntro, setShowIntro] = useState(true);
   const [step, setStep] = useState(0);
 
@@ -195,6 +203,52 @@ export function ModelingStage({
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    void tracker.saveSnapshot(
+      {
+        showIntro,
+        step,
+        userMessage,
+        tcpDropped,
+        selectedDest,
+        wrongDestId,
+        macToggled,
+        listenState,
+        listenProgress,
+        transmitted,
+        isTransmitting,
+        bitStream,
+        macStripped,
+        ipStripped,
+        tapCount,
+        tcpOpened,
+        errorMsg,
+      },
+      { progressPercent: Math.min(100, Math.round((step / 8) * 100)) },
+    );
+  }, [
+    bitStream,
+    errorMsg,
+    ipStripped,
+    isTransmitting,
+    lessonId,
+    listenProgress,
+    listenState,
+    macStripped,
+    macToggled,
+    selectedDest,
+    showIntro,
+    stageIndex,
+    step,
+    tapCount,
+    tcpDropped,
+    tcpOpened,
+    tracker,
+    transmitted,
+    userMessage,
+    wrongDestId,
+  ]);
 
   const showError = useCallback((msg: string) => {
     setErrorMsg(msg);
@@ -284,7 +338,12 @@ export function ModelingStage({
 
   const goNext = () => {
     if (!isStepDone) return;
-    if (step === 8) { onComplete({ userMessage }); return; }
+    if (step === 8) {
+      const finalAnswer = { userMessage };
+      void tracker.complete(finalAnswer, { step, userMessage, completed: true });
+      onComplete(finalAnswer);
+      return;
+    }
     setStep(s => s + 1);
     setErrorMsg(null);
   };

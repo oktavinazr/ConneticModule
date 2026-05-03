@@ -6,6 +6,7 @@ import {
 import { useDrag, useDrop } from 'react-dnd';
 import { getCurrentUser } from '../../utils/auth';
 import { getLessonProgress, saveStageAttempt } from '../../utils/progress';
+import { useActivityTracker } from '../../hooks/useActivityTracker';
 
 // -- Types ----------------------------------------------------------------------
 
@@ -176,7 +177,7 @@ function StoryDropSlot({ slotNum, fragment, validated, onDrop, onReturn }: {
 }
 
 function StoryScramblePhase({
-  storyScramble, videoUrl, apersepsi, essayPrompt, lessonId, stageIndex, onComplete,
+  storyScramble, videoUrl, apersepsi, essayPrompt, lessonId, stageIndex, onComplete, initialData,
 }: {
   storyScramble: NonNullable<ConstructivismStageProps['storyScramble']>;
   videoUrl?: string;
@@ -184,7 +185,8 @@ function StoryScramblePhase({
   essayPrompt?: string;
   lessonId: string;
   stageIndex: number;
-  onComplete: (essayText?: string) => void;
+  onComplete: (essayText?: string, currentSlots?: Record<number, string>) => void;
+  initialData?: { slots?: Record<number, string>; validated?: boolean };
 }) {
   const user = getCurrentUser();
 
@@ -197,8 +199,8 @@ function StoryScramblePhase({
     return arr;
   }, []);
 
-  const [slots, setSlots] = useState<Record<number, string>>({});
-  const [validated, setValidated] = useState(false);
+  const [slots, setSlots] = useState<Record<number, string>>(initialData?.slots || {});
+  const [validated, setValidated] = useState(initialData?.validated || false);
   const [attempts, setAttempts] = useState(0);
   const [showPost, setShowPost] = useState(false);
 
@@ -207,6 +209,11 @@ function StoryScramblePhase({
       setAttempts(p.stageAttempts[`stage_${stageIndex}`] || 0);
     });
   }, []);
+
+  useEffect(() => {
+    if (initialData?.slots) setSlots(initialData.slots);
+    if (initialData?.validated) setValidated(initialData.validated);
+  }, [initialData]);
 
   const placedIds = new Set(Object.values(slots));
   const pool = shuffled.filter(f => !placedIds.has(f.id));
@@ -220,13 +227,19 @@ function StoryScramblePhase({
       const next = { ...prev };
       Object.keys(next).forEach(k => { if (next[Number(k)] === id) delete next[Number(k)]; });
       next[slotNum] = id;
+      onComplete(undefined, next);
       return next;
     });
   };
 
   const handleReturnToPool = (slotNum: number) => {
     if (validated) return;
-    setSlots(prev => { const next = { ...prev }; delete next[slotNum]; return next; });
+    setSlots(prev => {
+      const next = { ...prev };
+      delete next[slotNum];
+      onComplete(undefined, next);
+      return next;
+    });
   };
 
   const isCorrectOrder = allFilled && storyScramble.fragments.every((_, i) => {
@@ -238,6 +251,7 @@ function StoryScramblePhase({
     const newAttempts = await saveStageAttempt(user!.id, lessonId, stageIndex, isCorrectOrder);
     setAttempts(newAttempts);
     setValidated(true);
+    onComplete(undefined, slots);
     if (isCorrectOrder || newAttempts >= 3) {
       setTimeout(() => setShowPost(true), isCorrectOrder ? 700 : 0);
     }
@@ -251,6 +265,7 @@ function StoryScramblePhase({
     setSlots(prev => {
       const next = { ...prev };
       wrongSlots.forEach(([k]) => delete next[Number(k)]);
+      onComplete(undefined, next);
       return next;
     });
     setValidated(false);
@@ -520,9 +535,10 @@ function BoxDropSlot({ slotNum, placedItem, validated, isCorrect, onDrop, onRetu
   );
 }
 
-function OrderedProcessChain({ items, essayPrompt, lessonId, stageIndex, onComplete }: {
+function OrderedProcessChain({ items, essayPrompt, lessonId, stageIndex, onComplete, initialData }: {
   items: AnalogyItem[]; essayPrompt?: string; lessonId: string; stageIndex: number;
-  onComplete: (essayText?: string) => void;
+  onComplete: (essayText?: string, currentSlots?: Record<string, string>) => void;
+  initialData?: { slots?: Record<string, string>; validated?: boolean };
 }) {
   const user = getCurrentUser();
 
@@ -539,8 +555,8 @@ function OrderedProcessChain({ items, essayPrompt, lessonId, stageIndex, onCompl
     return result;
   }, []);
 
-  const [slots, setSlots] = useState<Record<string, string>>({});
-  const [validated, setValidated] = useState(false);
+  const [slots, setSlots] = useState<Record<string, string>>(initialData?.slots || {});
+  const [validated, setValidated] = useState(initialData?.validated || false);
   const [attempts, setAttempts] = useState(0);
   const [showEssay, setShowEssay] = useState(false);
 
@@ -549,6 +565,11 @@ function OrderedProcessChain({ items, essayPrompt, lessonId, stageIndex, onCompl
       setAttempts(p.stageAttempts[`stage_${stageIndex}_analogy`] || 0)
     );
   }, []);
+
+  useEffect(() => {
+    if (initialData?.slots) setSlots(initialData.slots);
+    if (initialData?.validated) setValidated(initialData.validated);
+  }, [initialData]);
 
   const placedIds = new Set(Object.values(slots));
   const pool = allBoxItems.filter(it => !placedIds.has(it.id));
@@ -562,13 +583,19 @@ function OrderedProcessChain({ items, essayPrompt, lessonId, stageIndex, onCompl
       const next = { ...prev };
       Object.keys(next).forEach(k => { if (next[k] === itemId) delete next[k]; });
       next[`${boxType}-${slotNum}`] = itemId;
+      onComplete(undefined, next);
       return next;
     });
   };
 
   const handleReturn = (boxType: BoxItemType, slotNum: number) => {
     if (validated) return;
-    setSlots(prev => { const next = { ...prev }; delete next[`${boxType}-${slotNum}`]; return next; });
+    setSlots(prev => {
+      const next = { ...prev };
+      delete next[`${boxType}-${slotNum}`];
+      onComplete(undefined, next);
+      return next;
+    });
   };
 
   const isCorrectOrder = allPlaced && allBoxItems.every(item => slots[`${item.type}-${item.correctOrder}`] === item.id);
@@ -578,6 +605,7 @@ function OrderedProcessChain({ items, essayPrompt, lessonId, stageIndex, onCompl
     const newA = await saveStageAttempt(user!.id, lessonId, stageIndex, ok, `stage_${stageIndex}_analogy`);
     setAttempts(newA);
     setValidated(true);
+    onComplete(undefined, slots);
     if (isCorrectOrder || newA >= 3) setShowEssay(true);
   };
 
@@ -795,18 +823,19 @@ function AnalogyBucket({ group, items, validated, onDrop }: { group: AnalogyGrou
 }
 
 function GroupBucketContent({
-  groups, items, essayPrompt, lessonId, stageIndex, onComplete,
+  groups, items, essayPrompt, lessonId, stageIndex, onComplete, initialData,
 }: {
   groups: AnalogyGroup[];
   items: AnalogyItem[];
   essayPrompt?: string;
   lessonId: string;
   stageIndex: number;
-  onComplete: (essayText?: string) => void;
+  onComplete: (essayText?: string, currentPlacement?: Record<string, string>) => void;
+  initialData?: { placement?: Record<string, string>; validated?: boolean };
 }) {
   const user = getCurrentUser();
-  const [placement, setPlacement] = useState<Record<string, string>>({});
-  const [validated, setValidated] = useState(false);
+  const [placement, setPlacement] = useState<Record<string, string>>(initialData?.placement || {});
+  const [validated, setValidated] = useState(initialData?.validated || false);
   const [attempts, setAttempts] = useState(0);
   const [showEssay, setShowEssay] = useState(false);
 
@@ -815,6 +844,11 @@ function GroupBucketContent({
       setAttempts(p.stageAttempts[`stage_${stageIndex}_analogy`] || 0);
     });
   }, []);
+
+  useEffect(() => {
+    if (initialData?.placement) setPlacement(initialData.placement);
+    if (initialData?.validated) setValidated(initialData.validated);
+  }, [initialData]);
 
   const unplaced = items.filter(it => !placement[it.id]);
   const itemsInGroup = (gid: string) => items.filter(it => placement[it.id] === gid);
@@ -829,7 +863,11 @@ function GroupBucketContent({
 
   const handleDrop = (groupId: string, itemId: string) => {
     if (validated) return;
-    setPlacement(prev => ({ ...prev, [itemId]: groupId }));
+    setPlacement(prev => {
+      const next = { ...prev, [itemId]: groupId };
+      onComplete(undefined, next);
+      return next;
+    });
   };
 
   const handleValidate = async () => {
@@ -837,6 +875,7 @@ function GroupBucketContent({
     const newAttempts = await saveStageAttempt(user!.id, lessonId, stageIndex, isCorrect, `stage_${stageIndex}_analogy`);
     setAttempts(newAttempts);
     setValidated(true);
+    onComplete(undefined, placement);
   };
 
   const handleRetry = () => {
@@ -957,14 +996,15 @@ function AnalogyContent(props: {
   essayPrompt?: string;
   lessonId: string;
   stageIndex: number;
-  onComplete: (essayText?: string) => void;
+  onComplete: (essayText?: string, state?: any) => void;
+  initialData?: any;
 }) {
-  const { groups, items, essayPrompt, lessonId, stageIndex, onComplete } = props;
+  const { groups, items, essayPrompt, lessonId, stageIndex, onComplete, initialData } = props;
   const isOrderedMode = items.length > 0 && items.every(it => it.correctOrder !== undefined);
   if (isOrderedMode) {
-    return <OrderedProcessChain items={items} essayPrompt={essayPrompt} lessonId={lessonId} stageIndex={stageIndex} onComplete={onComplete} />;
+    return <OrderedProcessChain items={items} essayPrompt={essayPrompt} lessonId={lessonId} stageIndex={stageIndex} onComplete={onComplete} initialData={initialData} />;
   }
-  return <GroupBucketContent groups={groups} items={items} essayPrompt={essayPrompt} lessonId={lessonId} stageIndex={stageIndex} onComplete={onComplete} />;
+  return <GroupBucketContent groups={groups} items={items} essayPrompt={essayPrompt} lessonId={lessonId} stageIndex={stageIndex} onComplete={onComplete} initialData={initialData} />;
 }
 
 function AnalogyPhase(props: {
@@ -973,18 +1013,19 @@ function AnalogyPhase(props: {
   essayPrompt?: string;
   lessonId: string;
   stageIndex: number;
-  onComplete: (essayText?: string) => void;
+  onComplete: (essayText?: string, state?: any) => void;
+  initialData?: any;
 }) {
   return <AnalogyContent {...props} />;
 }
 
 function MCQPhase({
-  apersepsi, question, options, correctAnswer, feedback, videoUrl, lessonId, stageIndex, onComplete,
-}: Omit<ConstructivismStageProps, 'storyScramble' | 'analogySortGroups' | 'analogySortItems' | 'constructivismEssay1' | 'constructivismEssay2'>) {
+  apersepsi, question, options, correctAnswer, feedback, videoUrl, lessonId, stageIndex, onComplete, initialData,
+}: Omit<ConstructivismStageProps, 'storyScramble' | 'analogySortGroups' | 'analogySortItems' | 'constructivismEssay1' | 'constructivismEssay2'> & { initialData?: { selectedOption?: string; reason?: string; submitted?: boolean } }) {
   const user = getCurrentUser();
-  const [selectedOption, setSelectedOption] = useState('');
-  const [reason, setReason] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const [selectedOption, setSelectedOption] = useState(initialData?.selectedOption || '');
+  const [reason, setReason] = useState(initialData?.reason || '');
+  const [submitted, setSubmitted] = useState(initialData?.submitted || false);
   const [error, setError] = useState('');
   const [attempts, setAttempts] = useState(0);
 
@@ -993,6 +1034,12 @@ function MCQPhase({
       setAttempts(p.stageAttempts[`stage_${stageIndex}`] || 0);
     });
   }, []);
+
+  useEffect(() => {
+    if (initialData?.selectedOption) setSelectedOption(initialData.selectedOption);
+    if (initialData?.reason) setReason(initialData.reason);
+    if (initialData?.submitted) setSubmitted(initialData.submitted);
+  }, [initialData]);
 
   const isCorrect = selectedOption === correctAnswer;
   const showExplanation = submitted && (isCorrect || attempts >= 3);
@@ -1004,6 +1051,7 @@ function MCQPhase({
     const newAttempts = await saveStageAttempt(user!.id, lessonId, stageIndex, selectedOption === correctAnswer);
     setAttempts(newAttempts);
     setSubmitted(true);
+    onComplete({ selectedOption, reason, isCorrect: selectedOption === correctAnswer });
   };
 
   return (
@@ -1106,6 +1154,11 @@ export function ConstructivismStage(props: ConstructivismStageProps) {
     constructivismEssay1, constructivismEssay2,
     videoUrl, apersepsi, isCompleted,
   } = props;
+  const tracker = useActivityTracker({
+    lessonId,
+    stageIndex,
+    stageType: 'constructivism',
+  });
 
   const [phase, setPhase] = useState<'scramble' | 'analogy' | 'mcq'>(() => {
     if (storyScramble) return 'scramble';
@@ -1114,8 +1167,44 @@ export function ConstructivismStage(props: ConstructivismStageProps) {
   });
 
   const [essay1Text, setEssay1Text] = useState('');
+  const [scrambleData, setScrambleData] = useState<any>(null);
+  const [analogyData, setAnalogyData] = useState<any>(null);
+  const [mcqData, setMcqData] = useState<any>(null);
+  const [isRestored, setIsRestored] = useState(false);
 
   const hasEssayFlow = !!(constructivismEssay1 || constructivismEssay2);
+
+  useEffect(() => {
+    if (!tracker.isLoading && tracker.session?.latestSnapshot && !isRestored) {
+      const snap = tracker.session.latestSnapshot;
+      if (snap.phase) setPhase(snap.phase);
+      if (snap.essay1Text) setEssay1Text(snap.essay1Text);
+      if (snap.scrambleData) setScrambleData(snap.scrambleData);
+      if (snap.analogyData) setAnalogyData(snap.analogyData);
+      if (snap.mcqData) setMcqData(snap.mcqData);
+      setIsRestored(true);
+    } else if (!tracker.isLoading) {
+      setIsRestored(true);
+    }
+  }, [tracker.isLoading, tracker.session, isRestored]);
+
+  useEffect(() => {
+    if (!isRestored) return;
+    const progressMap = { scramble: 20, analogy: 55, mcq: 80 } as const;
+    void tracker.saveSnapshot(
+      {
+        phase,
+        essay1Text,
+        scrambleData,
+        analogyData,
+        mcqData,
+        hasStoryScramble: !!storyScramble,
+        hasAnalogy: !!analogySortGroups?.length,
+        hasEssayFlow,
+      },
+      { progressPercent: progressMap[phase] },
+    );
+  }, [analogyData, analogySortGroups?.length, essay1Text, hasEssayFlow, isRestored, mcqData, phase, scrambleData, storyScramble, tracker]);
 
   const SkipButton = ({ targetPhase, nextLabel }: { targetPhase?: 'analogy' | 'mcq' | 'complete'; nextLabel: string }) => {
     if (!isCompleted) return null;
@@ -1134,6 +1223,15 @@ export function ConstructivismStage(props: ConstructivismStageProps) {
     );
   };
 
+  if (tracker.isLoading || !isRestored) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <div className="w-12 h-12 border-4 border-[#628ECB] border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-bold text-[#395886]">Memuat progres...</p>
+      </div>
+    );
+  }
+
   if (phase === 'scramble' && storyScramble) {
     return (
       <div className="space-y-4">
@@ -1144,14 +1242,25 @@ export function ConstructivismStage(props: ConstructivismStageProps) {
           essayPrompt={constructivismEssay1}
           lessonId={lessonId}
           stageIndex={stageIndex}
-          onComplete={(essayText) => {
-            setEssay1Text(essayText || '');
-            if (analogySortGroups?.length) {
-              setPhase('analogy');
-            } else if (hasEssayFlow || !props.options?.length) {
-              onComplete({ essay1: essayText });
-            } else {
-              setPhase('mcq');
+          initialData={scrambleData}
+          onComplete={(essayText, currentSlots) => {
+            if (essayText !== undefined) setEssay1Text(essayText);
+            if (currentSlots !== undefined) setScrambleData({ slots: currentSlots, validated: true });
+            
+            if (essayText !== undefined) {
+              if (analogySortGroups?.length) {
+                void tracker.trackEvent('constructivism_scramble_completed', { hasEssay: !!essayText }, { progressPercent: 45 });
+                setPhase('analogy');
+              } else if (hasEssayFlow || !props.options?.length) {
+                const finalAnswer = { essay1: essayText };
+                void tracker.complete(finalAnswer, { phase: 'scramble', finalAnswer });
+                onComplete(finalAnswer);
+              } else {
+                void tracker.trackEvent('constructivism_scramble_completed', { hasEssay: !!essayText }, { progressPercent: 70 });
+                setPhase('mcq');
+              }
+            } else if (currentSlots) {
+              setScrambleData({ slots: currentSlots });
             }
           }}
         />
@@ -1172,11 +1281,21 @@ export function ConstructivismStage(props: ConstructivismStageProps) {
           essayPrompt={constructivismEssay2}
           lessonId={lessonId}
           stageIndex={stageIndex}
-          onComplete={(essayText) => {
-            if (hasEssayFlow || !props.options?.length || !!storyScramble) {
-              onComplete({ essay1: essay1Text, essay2: essayText });
-            } else {
-              setPhase('mcq');
+          initialData={analogyData}
+          onComplete={(essayText, currentState) => {
+            if (currentState !== undefined) setAnalogyData({ ...currentState, validated: true });
+
+            if (essayText !== undefined) {
+              if (hasEssayFlow || !props.options?.length || !!storyScramble) {
+                const finalAnswer = { essay1: essay1Text, essay2: essayText };
+                void tracker.complete(finalAnswer, { phase: 'analogy', finalAnswer });
+                onComplete(finalAnswer);
+              } else {
+                void tracker.trackEvent('constructivism_analogy_completed', { hasEssay: !!essayText }, { progressPercent: 80 });
+                setPhase('mcq');
+              }
+            } else if (currentState) {
+              setAnalogyData(currentState);
             }
           }}
         />
@@ -1190,7 +1309,15 @@ export function ConstructivismStage(props: ConstructivismStageProps) {
 
   return (
     <div className="space-y-4">
-      <MCQPhase {...props} onComplete={onComplete} />
+      <MCQPhase
+        {...props}
+        initialData={mcqData}
+        onComplete={(answer) => {
+          setMcqData({ ...answer, submitted: true });
+          void tracker.complete(answer, { phase: 'mcq', finalAnswer: answer });
+          onComplete(answer);
+        }}
+      />
       <SkipButton targetPhase="complete" nextLabel="Selesaikan Tahap Ini" />
     </div>
   );

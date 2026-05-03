@@ -26,6 +26,7 @@ import { getLessonProgress, LessonProgress } from '../utils/progress';
 import { lessons, type TestQuestion, getStageDisplayTitle } from '../data/lessons';
 import { Logo } from '../components/layout/Logo';
 import { StageAnswerDetail, CTL_META } from '../components/admin/StageDetail';
+import { getLessonActivitySessions, type CTLActivitySession } from '../utils/activityTracking';
 
 type ReviewSection = 'pretest' | 'ctl' | 'posttest' | string;
 
@@ -37,6 +38,7 @@ export function ReviewPage() {
   const printRef = useRef<HTMLDivElement>(null);
 
   const [progress, setProgress] = useState<LessonProgress | null>(null);
+  const [activitySessions, setActivitySessions] = useState<CTLActivitySession[]>([]);
   const [activeSection, setActiveSection] = useState<ReviewSection>('pretest');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -53,6 +55,7 @@ export function ReviewPage() {
       setProgress(p);
       setIsLoading(false);
     });
+    getLessonActivitySessions(user.id, lessonId!).then(setActivitySessions);
   }, [user, lesson, lessonId, navigate]);
 
   if (isLoading) {
@@ -227,7 +230,8 @@ export function ReviewPage() {
                 {activeSection.startsWith('ctl-') && (() => {
                   const idx = parseInt(activeSection.split('-')[1]);
                   const stage = lesson.stages[idx];
-                  const answer = progress.answers[idx];
+                  const answer = progress.answers[`stage_${idx}`] ?? progress.answers[idx];
+                  const tracking = activitySessions.find((session) => session.stageIndex === idx);
                   const meta = CTL_META[stage.type];
                   
                   return (
@@ -252,6 +256,27 @@ export function ReviewPage() {
                         </div>
                         <StageAnswerDetail stage={stage} answer={answer} />
                       </div>
+
+                      {tracking && (
+                        <div className="grid gap-3 sm:grid-cols-4">
+                          <div className="bg-white rounded-2xl border border-[#D5DEEF] p-4">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-[#395886]/40">Status</p>
+                            <p className="text-sm font-bold text-[#395886] mt-1">{tracking.status}</p>
+                          </div>
+                          <div className="bg-white rounded-2xl border border-[#D5DEEF] p-4">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-[#395886]/40">Percobaan</p>
+                            <p className="text-sm font-bold text-[#395886] mt-1">{tracking.totalAttempts}</p>
+                          </div>
+                          <div className="bg-white rounded-2xl border border-[#D5DEEF] p-4">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-[#395886]/40">Kesalahan</p>
+                            <p className="text-sm font-bold text-[#395886] mt-1">{tracking.totalErrors}</p>
+                          </div>
+                          <div className="bg-white rounded-2xl border border-[#D5DEEF] p-4">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-[#395886]/40">Progress</p>
+                            <p className="text-sm font-bold text-[#395886] mt-1">{tracking.progressPercent}%</p>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="bg-white rounded-3xl border border-[#D5DEEF] p-6 flex items-center gap-4">
                         <div className="h-10 w-10 rounded-full bg-[#10B981]/10 flex items-center justify-center text-[#10B981]">

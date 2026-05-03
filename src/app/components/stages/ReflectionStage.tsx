@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getCurrentUser } from '../../utils/auth';
 import { getLessonProgress, saveStageAttempt } from '../../utils/progress';
+import { useActivityTracker } from '../../hooks/useActivityTracker';
 
 // -- Types ----------------------------------------------------------------------
 
@@ -58,10 +59,35 @@ const CONCEPT_POOL = [
 
 const CONNECTION_LABELS = ['Berhubungan dengan', 'Bagian dari', 'Mengakibatkan', 'Membutuhkan', 'Mengamankan'];
 
-function ConceptMapBuilder({ lessonId, stageIndex, onNext }: { lessonId: string; stageIndex: number; onNext: (data: any) => void }) {
-  const [nodes, setNodes] = useState<ConceptNode[]>([]);
-  const [connections, setConnections] = useState<Connection[]>([]);
-  const [selectedFrom, setSelectedFrom] = useState<string | null>(null);
+function ConceptMapBuilder({ lessonId, stageIndex, onNext, initialData }: { lessonId: string; stageIndex: number; onNext: (data: any) => void; initialData?: any }) {
+  const tracker = useActivityTracker({
+    lessonId,
+    stageIndex,
+    stageType: 'reflection',
+  });
+  const [nodes, setNodes] = useState<ConceptNode[]>(initialData?.nodes || []);
+  const [connections, setConnections] = useState<Connection[]>(initialData?.connections || []);
+  const [selectedFrom, setSelectedFrom] = useState<string | null>(initialData?.selectedFrom || null);
+
+  useEffect(() => {
+    if (initialData?.nodes) setNodes(initialData.nodes);
+    if (initialData?.connections) setConnections(initialData.connections);
+    if (initialData?.selectedFrom) setSelectedFrom(initialData.selectedFrom);
+  }, [initialData]);
+
+  useEffect(() => {
+    void tracker.saveSnapshot(
+      {
+        phase: 'map',
+        nodes,
+        connections,
+        selectedFrom,
+      },
+      {
+        progressPercent: nodes.length === 0 ? 5 : Math.min(60, 10 + nodes.length * 10 + connections.length * 8),
+      },
+    );
+  }, [connections, nodes, selectedFrom, tracker]);
 
   const addNode = (concept: typeof CONCEPT_POOL[0]) => {
     if (nodes.find(n => n.id === concept.id)) return;
@@ -71,6 +97,7 @@ function ConceptMapBuilder({ lessonId, stageIndex, onNext }: { lessonId: string;
       y: 50 + Math.random() * 150
     };
     setNodes([...nodes, newNode]);
+    void tracker.trackEvent('concept_node_added', { conceptId: concept.id, label: concept.label });
   };
 
   const handleNodeClick = (id: string) => {
@@ -82,6 +109,7 @@ function ConceptMapBuilder({ lessonId, stageIndex, onNext }: { lessonId: string;
       // Create connection
       if (!connections.find(c => (c.from === selectedFrom && c.to === id) || (c.from === id && c.to === selectedFrom))) {
         setConnections([...connections, { from: selectedFrom, to: id, label: CONNECTION_LABELS[0] }]);
+        void tracker.trackEvent('concept_connection_added', { from: selectedFrom, to: id });
       }
       setSelectedFrom(null);
     }
@@ -145,9 +173,34 @@ function ConceptMapBuilder({ lessonId, stageIndex, onNext }: { lessonId: string;
 
 // -- Essay + Self-Eval ---------------------------------------------------------
 
-function EssayPhase({ onDone }: { onDone: (data: any) => void }) {
-  const [essay, setEssay] = useState('');
-  const [confidence, setConfidence] = useState(3);
+function EssayPhase({ lessonId, stageIndex, mapData, onDone, initialData }: { lessonId: string; stageIndex: number; mapData: any; onDone: (data: any) => void; initialData?: any }) {
+  const tracker = useActivityTracker({
+    lessonId,
+    stageIndex,
+    stageType: 'reflection',
+  });
+  const [essay, setEssay] = useState(initialData?.essay || '');
+  const [confidence, setConfidence] = useState(initialData?.confidence || 3);
+
+  useEffect(() => {
+    if (initialData?.essay) setEssay(initialData.essay);
+    if (initialData?.confidence) setConfidence(initialData.confidence);
+  }, [initialData]);
+
+  useEffect(() => {
+    void tracker.saveSnapshot(
+      {
+        phase: 'essay',
+        mapData,
+        essay,
+        confidence,
+      },
+      {
+        progressPercent: essay.length < 10 ? 70 : Math.min(95, 70 + Math.round(Math.min(25, essay.length / 6))),
+      },
+    );
+  }, [confidence, essay, mapData, tracker]);
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-in zoom-in-95 duration-500">
       <div className="bg-white rounded-[2rem] border-2 border-[#D5DEEF] p-8 shadow-sm">
@@ -181,10 +234,37 @@ function EssayPhase({ onDone }: { onDone: (data: any) => void }) {
 // -- Root component ------------------------------------------------------------
 
 export function ReflectionStage({ lessonId, stageIndex, moduleId, onComplete, isCompleted }: ReflectionStageProps) {
+  const tracker = useActivityTracker({
+    lessonId,
+    stageIndex,
+    stageType: 'reflection',
+  });
   const [phase, setPhase] = useState<'map' | 'essay'>(isCompleted ? 'essay' : 'map');
   const [mapData, setMapData] = useState<any>(null);
+  const [essayData, setEssayData] = useState<any>(null);
+  const [isRestored, setIsRestored] = useState(false);
 
-  if (phase === 'map') return <ConceptMapBuilder lessonId={lessonId} stageIndex={stageIndex} onNext={(data) => { setMapData(data); setPhase('essay'); }} />;
-  if (phase === 'essay') return <EssayPhase onDone={(data) => onComplete({ ...data, mapData })} />;
+  useEffect(() => {
+    if (!tracker.isLoading && tracker.session?.latestSnapshot && !isRestored) {
+      const snap = tracker.session.latestSnapshot;
+      if (snap.phase) setPhase(snap.phase);
+      if (snap.mapData) setMapData(snap.mapData);
+      if (snap.nodes) setMapData({ nodes: snap.nodes, connections: snap.connections });
+      if (snap.essay || snap.confidence) setEssayData({ essay: snap.essay, confidence: snap.confidence });
+      setIsRestored(true);
+    } else if (!tracker.isLoading) {
+      setIsRestored(true);
+    }
+  }, [tracker.isLoading, tracker.session, isRestored]);
+
+  if (tracker.isLoading || !isRestored) return (
+    <div className="flex flex-col items-center justify-center py-20 space-y-4">
+      <div className="w-12 h-12 border-4 border-[#F59E0B] border-t-transparent rounded-full animate-spin" />
+      <p className="text-sm font-bold text-[#395886]">Memuat progres...</p>
+    </div>
+  );
+
+  if (phase === 'map') return <ConceptMapBuilder lessonId={lessonId} stageIndex={stageIndex} initialData={mapData} onNext={(data) => { setMapData(data); void tracker.trackEvent('reflection_map_completed', { nodeCount: data?.nodes?.length ?? 0, connectionCount: data?.connections?.length ?? 0 }, { progressPercent: 70 }); setPhase('essay'); }} />;
+  if (phase === 'essay') return <EssayPhase lessonId={lessonId} stageIndex={stageIndex} mapData={mapData} initialData={essayData} onDone={(data) => { const finalAnswer = { ...data, mapData }; void tracker.complete(finalAnswer, { phase: 'completed', finalAnswer }); onComplete(finalAnswer); }} />;
   return null;
 }

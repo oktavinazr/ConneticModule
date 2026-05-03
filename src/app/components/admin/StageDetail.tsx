@@ -70,15 +70,26 @@ export function getStageAnswerSummary(stage: Stage, answer: any): string {
   try {
     switch (stage.type) {
       case 'constructivism': {
-        const a = answer as { selectedOption?: string };
-        const opt = stage.options?.find((o: any) => o.id === a.selectedOption);
-        return opt ? `Pilihan: "${opt.text.slice(0, 40)}..."` : 'Selesai';
+        const a = answer as any;
+        if (a.selectedOption || a.mcqData) {
+          const data = a.mcqData || a;
+          const opt = stage.options?.find((o: any) => o.id === data.selectedOption);
+          return opt ? `Pilihan: "${opt.text.slice(0, 40)}..."` : 'Selesai (PG)';
+        }
+        if (a.essay1 || a.essay1Text) return 'Esai Selesai';
+        if (a.phase === 'scramble') return 'Sedang Menyusun Cerita';
+        if (a.phase === 'analogy') return 'Sedang Mengerjakan Analogi';
+        return 'Selesai';
       }
       case 'inquiry': {
-        if (answer.type === 'lesson1_format') {
-          return 'Selesai (2 Refleksi)';
+        const a = answer as any;
+        if (a.type === 'lesson1_format' || a.reflection1 || a.reflection2) {
+          return 'Selesai (Format Refleksi)';
         }
-        const matched = Object.keys(answer as Record<string, string>).length;
+        if (a.flowData || a.groupData || a.matchingData) {
+          return 'Dalam Aktivitas';
+        }
+        const matched = Object.keys(a).length;
         return `${matched} item selesai`;
       }
       case 'questioning': {
@@ -99,6 +110,8 @@ export function getStageAnswerSummary(stage: Stage, answer: any): string {
         return 'Selesai';
       case 'reflection': {
         const a = answer as any;
+        if (a.phase === 'map') return 'Sedang Membuat Peta Konsep';
+        if (a.phase === 'essay' || a.essay) return 'Sedang Menulis Esai';
         const essayCount = Object.values(a.essays ?? {}).filter((v: any) => v.length > 0).length;
         return `${essayCount} esai selesai`;
       }
@@ -120,37 +133,80 @@ export function StageAnswerDetail({ stage, answer }: { stage: Stage; answer: any
   try {
     switch (stage.type) {
       case 'constructivism': {
-        const a = answer as { selectedOption?: string; reason?: string };
-        const opt = stage.options?.find((o: any) => o.id === a.selectedOption);
-        return (
-          <div className="space-y-2 text-sm">
-            <div>
-              <span className="text-xs font-bold text-[#395886]/50 uppercase">Pilihan:</span>
-              <p className="text-[#395886] mt-0.5">{opt?.text ?? a.selectedOption ?? '—'}</p>
-            </div>
-            {a.reason && (
-              <div>
-                <span className="text-xs font-bold text-[#395886]/50 uppercase">Alasan:</span>
-                <p className="text-[#395886] mt-0.5 bg-[#F0F3FA] rounded-lg px-3 py-2 text-sm leading-relaxed">{a.reason}</p>
-              </div>
-            )}
-          </div>
-        );
-      }
-      case 'inquiry': {
-        if (answer.type === 'lesson1_format') {
+        const a = answer as any;
+        
+        if (a.selectedOption || a.mcqData) {
+          const data = a.mcqData || a;
+          const opt = stage.options?.find((o: any) => o.id === data.selectedOption);
           return (
-            <div className="space-y-3 text-sm">
-               <div className="bg-[#F0F3FA] rounded-lg p-3">
-                  <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">Refleksi Layer Sorting</p>
-                  <p className="text-[#395886] italic">"{answer.reflection1}"</p>
-               </div>
-               <div className="bg-[#F0F3FA] rounded-lg p-3">
-                  <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">Refleksi Fungsi Layer</p>
-                  <p className="text-[#395886] italic">"{answer.reflection2}"</p>
-               </div>
+            <div className="space-y-2 text-sm">
+              <div>
+                <span className="text-xs font-bold text-[#395886]/50 uppercase">Pilihan:</span>
+                <p className="text-[#395886] mt-0.5">{opt?.text ?? data.selectedOption ?? '—'}</p>
+              </div>
+              {data.reason && (
+                <div>
+                  <span className="text-xs font-bold text-[#395886]/50 uppercase">Alasan:</span>
+                  <p className="text-[#395886] mt-0.5 bg-[#F0F3FA] rounded-lg px-3 py-2 text-xs leading-relaxed">{data.reason}</p>
+                </div>
+              )}
             </div>
           );
+        }
+
+        if (a.essay1 || a.essay2 || a.essay1Text || a.scrambleData || a.analogyData) {
+          return (
+            <div className="space-y-3 text-sm">
+              {(a.essay1 || a.essay1Text) && (
+                <div className="bg-[#F0F3FA] rounded-lg p-2.5">
+                   <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">Jawaban Esai 1</p>
+                   <p className="text-[#395886] text-xs italic">"{a.essay1 || a.essay1Text}"</p>
+                </div>
+              )}
+              {a.essay2 && (
+                <div className="bg-[#F0F3FA] rounded-lg p-2.5">
+                   <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">Jawaban Esai 2</p>
+                   <p className="text-[#395886] text-xs italic">"{a.essay2}"</p>
+                </div>
+              )}
+              {a.phase && (
+                <p className="text-[10px] font-bold text-[#628ECB] uppercase">Posisi: {a.phase}</p>
+              )}
+            </div>
+          );
+        }
+
+        return <p className="text-xs text-[#395886]/50 italic">Selesai (Format lain)</p>;
+      }
+      case 'inquiry': {
+        const a = answer as any;
+        if (a.type === 'lesson1_format' || a.reflection1 || a.reflection2) {
+          return (
+            <div className="space-y-3 text-sm">
+               {(a.reflection1 || a.essays?.reflection1) && (
+                 <div className="bg-[#F0F3FA] rounded-lg p-3">
+                    <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">Refleksi 1</p>
+                    <p className="text-[#395886] italic text-xs">"{a.reflection1 || a.essays?.reflection1}"</p>
+                 </div>
+               )}
+               {(a.reflection2 || a.essays?.reflection2) && (
+                 <div className="bg-[#F0F3FA] rounded-lg p-3">
+                    <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">Refleksi 2</p>
+                    <p className="text-[#395886] italic text-xs">"{a.reflection2 || a.essays?.reflection2}"</p>
+                 </div>
+               )}
+               {a.activityStep && <p className="text-[10px] font-bold text-[#10B981] uppercase">Step: {a.activityStep}</p>}
+            </div>
+          );
+        }
+        if (a.flowData || a.groupData || a.matchingData) {
+           return (
+             <div className="space-y-1 text-xs">
+                {a.flowData && <p className="text-[#395886]"><span className="font-bold">Flow:</span> {Object.keys(a.flowData.slots || {}).length} item</p>}
+                {a.groupData && <p className="text-[#395886]"><span className="font-bold">Group:</span> {Object.keys(a.groupData.placement || {}).length} item</p>}
+                {a.matchingData && <p className="text-[#395886]"><span className="font-bold">Match:</span> {Object.keys(a.matchingData.matches || {}).length} item</p>}
+             </div>
+           );
         }
         const pairs = answer as Record<string, string>;
         return (
@@ -232,6 +288,28 @@ export function StageAnswerDetail({ stage, answer }: { stage: Stage; answer: any
           easyPartPrompt: 'Bagian Termudah',
           hardPartPrompt: 'Bagian Tersulit',
         };
+
+        if (a.phase === 'map' || a.nodes) {
+          return (
+            <div className="space-y-2 text-xs">
+               <p className="font-bold text-orange-600 uppercase text-[10px]">Sedang Menyusun Peta Konsep</p>
+               <p className="text-[#395886]">{a.nodes?.length || 0} Konsep, {a.connections?.length || 0} Koneksi</p>
+            </div>
+          );
+        }
+
+        if (a.phase === 'essay' || a.essay) {
+          return (
+            <div className="space-y-3 text-sm">
+               <div className="bg-[#F0F3FA] rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-[#395886]/50 mb-1 uppercase">Refleksi Akhir</p>
+                  <p className="text-[#395886] leading-relaxed text-xs italic">"{a.essay}"</p>
+               </div>
+               {a.confidence && <p className="text-[10px] font-bold text-orange-600">Keyakinan: {a.confidence}/5</p>}
+            </div>
+          );
+        }
+
         const criteria = stage.selfEvaluationCriteria ?? [];
 
         return (

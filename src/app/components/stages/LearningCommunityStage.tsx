@@ -8,6 +8,7 @@ import {
 import { getCurrentUser } from '../../utils/auth';
 import { getLessonProgress, saveStageAttempt } from '../../utils/progress';
 import { createGroupDiscussion, getGroupDiscussions, toggleGroupDiscussionVote, type GroupDiscussion } from '../../utils/groups';
+import { useActivityTracker } from '../../hooks/useActivityTracker';
 
 // -- Types ----------------------------------------------------------------------
 
@@ -338,10 +339,30 @@ function ModuleFlow({
 
 export function LearningCommunityStage({ lessonId, stageIndex, moduleId, groupName, onComplete, isCompleted }: LearningCommunityStageProps) {
   const user = getCurrentUser();
+  const tracker = useActivityTracker({
+    lessonId,
+    stageIndex,
+    stageType: 'learning-community',
+  });
   const [subStage, setSubPhase] = useState<'init' | 'module1' | 'module2' | 'summary'>(isCompleted ? 'summary' : 'init');
   const [module1Data, setModule1Data] = useState<any>(null);
   const [module2Data, setModule2Data] = useState<any>(null);
   const [understood, setUnderstood] = useState(false);
+
+  useEffect(() => {
+    const progressMap = { init: 10, module1: 35, module2: 65, summary: 90 } as const;
+    void tracker.saveSnapshot(
+      {
+        subStage,
+        moduleId,
+        groupName,
+        understood,
+        module1Data,
+        module2Data,
+      },
+      { progressPercent: progressMap[subStage] },
+    );
+  }, [groupName, module1Data, module2Data, moduleId, subStage, tracker, understood]);
 
   // Lesson 1 Case Data
   const encapStudy: CaseStudy = { id: 'cs1', title: 'Misi Pengiriman Pesan', description: 'Kamu sedang berada di PC A dan ingin mengirim pesan "Halo Dunia". Langkah manakah yang harus kamu ambil terlebih dahulu menurut aturan Enkapsulasi?', options: [{ id: 'o1', text: 'Menempelkan IP Address PC B', isCorrect: false }, { id: 'o2', text: 'Membungkus data dengan TCP Header', isCorrect: true }, { id: 'o3', text: 'Mengirimkan bit melalui kabel', isCorrect: false }], correctFeedback: 'TCP Header (Transport) adalah langkah pertama setelah data dibuat di Application.' };
@@ -367,14 +388,14 @@ export function LearningCommunityStage({ lessonId, stageIndex, moduleId, groupNa
              <label htmlFor="understand" className="text-xs font-bold text-[#395886] cursor-pointer">Saya telah memahami instruksi dan siap berdiskusi secara real-time dengan kelompok.</label>
           </div>
 
-          <button onClick={() => setSubPhase('module1')} disabled={!understood} className="w-full py-4 rounded-2xl bg-[#395886] text-white font-black text-sm shadow-xl disabled:bg-[#D5DEEF] active:scale-95 transition-all">Mulai Aktivitas X.TCP.6</button>
+          <button onClick={() => { void tracker.trackEvent('learning_intro_confirmed', { groupName }, { progressPercent: 15 }); setSubPhase('module1'); }} disabled={!understood} className="w-full py-4 rounded-2xl bg-[#395886] text-white font-black text-sm shadow-xl disabled:bg-[#D5DEEF] active:scale-95 transition-all">Mulai Aktivitas X.TCP.6</button>
        </div>
     </div>
   );
 
-  if (subStage === 'module1') return <ModuleFlow lessonId={lessonId} moduleId="X.TCP.6" groupName={groupName} title="Proses Enkapsulasi" concept="Enkapsulasi adalah proses pembungkusan data dengan informasi kontrol (header) dari lapisan atas ke bawah." layers={['Application Data', 'TCP Segment', 'IP Packet', 'MAC Frame']} study={encapStudy} isEncapsulation={true} onModuleDone={d => { setModule1Data(d); setSubPhase('module2'); }} />;
-  if (subStage === 'module2') return <ModuleFlow lessonId={lessonId} moduleId="X.TCP.7" groupName={groupName} title="Proses Dekapsulasi" concept="Dekapsulasi adalah kebalikan dari enkapsulasi, di mana header dilepas satu per satu dari lapisan bawah ke atas." layers={['MAC Frame', 'IP Packet', 'TCP Segment', 'Application Data']} study={decapStudy} isEncapsulation={false} onModuleDone={d => { setModule2Data(d); setSubPhase('summary'); }} />;
-  if (subStage === 'summary') return <OverallResult lessonId={lessonId} groupName={groupName} onComplete={essay => onComplete({ module1Data, module2Data, finalConclusion: essay })} />;
+  if (subStage === 'module1') return <ModuleFlow lessonId={lessonId} moduleId="X.TCP.6" groupName={groupName} title="Proses Enkapsulasi" concept="Enkapsulasi adalah proses pembungkusan data dengan informasi kontrol (header) dari lapisan atas ke bawah." layers={['Application Data', 'TCP Segment', 'IP Packet', 'MAC Frame']} study={encapStudy} isEncapsulation={true} onModuleDone={d => { setModule1Data(d); void tracker.trackEvent('learning_module_completed', { moduleId: 'X.TCP.6' }, { progressPercent: 50 }); setSubPhase('module2'); }} />;
+  if (subStage === 'module2') return <ModuleFlow lessonId={lessonId} moduleId="X.TCP.7" groupName={groupName} title="Proses Dekapsulasi" concept="Dekapsulasi adalah kebalikan dari enkapsulasi, di mana header dilepas satu per satu dari lapisan bawah ke atas." layers={['MAC Frame', 'IP Packet', 'TCP Segment', 'Application Data']} study={decapStudy} isEncapsulation={false} onModuleDone={d => { setModule2Data(d); void tracker.trackEvent('learning_module_completed', { moduleId: 'X.TCP.7' }, { progressPercent: 80 }); setSubPhase('summary'); }} />;
+  if (subStage === 'summary') return <OverallResult lessonId={lessonId} groupName={groupName} onComplete={essay => { const finalAnswer = { module1Data, module2Data, finalConclusion: essay }; void tracker.complete(finalAnswer, { subStage: 'summary', finalAnswer }); onComplete(finalAnswer); }} />;
 
   return null;
 }

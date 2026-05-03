@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { lessons } from '../data/lessons';
+import { completeActivitySession, trackActivityEvent, type CTLStageType } from './activityTracking';
 
 export interface LessonProgress {
   lessonId: string;
@@ -311,6 +312,20 @@ export const saveStageAttempt = async (
   progress.stageAttempts[stageKey] = (progress.stageAttempts[stageKey] || 0) + 1;
   if (isCorrect) progress.stageSuccess[stageKey] = true;
   await upsertLessonProgress(progress);
+  const stageType = lessons[lessonId]?.stages?.[stageIndex]?.type as CTLStageType | undefined;
+  if (stageType) {
+    await trackActivityEvent({
+      userId,
+      lessonId,
+      stageIndex,
+      stageType,
+      eventType: 'attempt_recorded',
+      eventData: { attemptKey: stageKey },
+      isCorrect,
+      errorCount: isCorrect ? 0 : 1,
+      attemptDelta: 1,
+    });
+  }
   return progress.stageAttempts[stageKey];
 };
 
@@ -323,7 +338,22 @@ export const saveStageProgress = async (
     progress.completedStages.push(indexNum);
   }
   progress.answers[`stage_${indexNum}`] = answer;
+  progress.answers[indexNum] = answer;
   await upsertLessonProgress(progress);
+  const stageType = lessons[lessonId]?.stages?.[indexNum]?.type as CTLStageType | undefined;
+  if (stageType) {
+    await completeActivitySession({
+      userId,
+      lessonId,
+      stageIndex: indexNum,
+      stageType,
+      finalAnswer: answer,
+      latestSnapshot: {
+        completed: true,
+        finalAnswer: answer,
+      },
+    });
+  }
 };
 
 export const getAllProgress = async (userId: string): Promise<LessonProgress[]> => {

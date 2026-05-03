@@ -9,6 +9,8 @@ import {
   User,
   XCircle,
 } from 'lucide-react';
+import { useEffect } from 'react';
+import { useActivityTracker } from '../../hooks/useActivityTracker';
 
 interface FollowUpChoice {
   id: string;
@@ -49,6 +51,8 @@ interface AuthenticAssessmentStageProps {
 }
 
 export function AuthenticAssessmentStage({
+  lessonId,
+  stageIndex,
   branchingScenario,
   onComplete,
 }: AuthenticAssessmentStageProps) {
@@ -60,6 +64,11 @@ export function AuthenticAssessmentStage({
   const [followUpSubmitted, setFollowUpSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [isDone, setIsDone] = useState(false);
+  const tracker = useActivityTracker({
+    lessonId,
+    stageIndex,
+    stageType: 'authentic-assessment',
+  });
 
   const scenario = branchingScenario;
   const selectedBranch = useMemo(
@@ -72,6 +81,32 @@ export function AuthenticAssessmentStage({
   );
 
   if (!scenario) return null;
+
+  useEffect(() => {
+    void tracker.saveSnapshot(
+      {
+        initialChoice,
+        initialReason,
+        initialSubmitted,
+        followUpChoice,
+        followUpReason,
+        followUpSubmitted,
+        isDone,
+      },
+      {
+        progressPercent: showFinalSummary ? 85 : initialSubmitted ? 55 : initialChoice ? 25 : 5,
+      },
+    );
+  }, [
+    followUpChoice,
+    followUpReason,
+    followUpSubmitted,
+    initialChoice,
+    initialReason,
+    initialSubmitted,
+    isDone,
+    showFinalSummary,
+  ]);
 
   const handleInitialSubmit = () => {
     if (!initialChoice) {
@@ -86,6 +121,10 @@ export function AuthenticAssessmentStage({
 
     setError('');
     setInitialSubmitted(true);
+    void tracker.trackEvent('initial_decision_submitted', {
+      initialChoice,
+      reasonLength: initialReason.trim().length,
+    }, { progressPercent: 55 });
   };
 
   const handleFollowUpSubmit = () => {
@@ -101,6 +140,10 @@ export function AuthenticAssessmentStage({
 
     setError('');
     setFollowUpSubmitted(true);
+    void tracker.trackEvent('follow_up_submitted', {
+      followUpChoice,
+      reasonLength: followUpReason.trim().length,
+    }, { progressPercent: 85 });
   };
 
   const handleReset = () => {
@@ -115,15 +158,23 @@ export function AuthenticAssessmentStage({
   };
 
   const handleComplete = () => {
-    setIsDone(true);
-    onComplete({
+    const finalAnswer = {
       initialChoice,
       initialReason,
       followUpChoice,
       followUpReason,
       isOptimal: selectedBranch?.isOptimal ?? false,
       isFollowUpCorrect: selectedFollowUp?.isCorrect ?? false,
+    };
+    setIsDone(true);
+    void tracker.complete(finalAnswer, {
+      initialChoice,
+      initialSubmitted,
+      followUpChoice,
+      followUpSubmitted,
+      finalAnswer,
     });
+    onComplete(finalAnswer);
   };
 
   const showFinalSummary =
