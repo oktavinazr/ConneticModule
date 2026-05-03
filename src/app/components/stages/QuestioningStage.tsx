@@ -4,7 +4,7 @@ import {
   AlertCircle, CheckCircle, ChevronRight, Clock, Eye,
   GripVertical, HelpCircle, Info, Lightbulb, MessageSquare, PenLine,
   RotateCcw, User, WifiOff, XCircle, Zap, ArrowRight, MapPin,
-  Smartphone, Package, Map as MapIcon, Home, Activity, Route, Box, Cable
+  Smartphone, Package, Map as MapIcon, Home, Activity, Route, Box, Cable, Layers
 } from 'lucide-react';
 import { getCurrentUser } from '../../utils/auth';
 import { getLessonProgress, saveStageAttempt } from '../../utils/progress';
@@ -112,7 +112,6 @@ const DISRUPTIONS = [
 // -- Drag & Drop for Pizza Simulation -------------------------------------------
 
 const DRAG_PIZZA = 'PIZZA_LAYER';
-const DRAG_PIZZA_POOL = 'PIZZA_POOL_RETURN';
 
 function DraggableLayerTag({ name, layer, disabled }: {
   name: string; layer: typeof PIZZA_LAYERS[0]; disabled?: boolean;
@@ -335,7 +334,13 @@ function DisruptionSimulation({ lessonId, stageIndex, onComplete }: {
 
   const handleDrop = (disruptionId: string, layerName: string) => {
     if (validated) return;
-    setPlacements(prev => ({ ...prev, [disruptionId]: layerName }));
+    setPlacements(prev => {
+       const next = { ...prev };
+       // If card was in another disruption, move it
+       Object.keys(next).forEach(k => { if (next[k] === layerName) delete next[k]; });
+       next[disruptionId] = layerName;
+       return next;
+    });
   };
 
   const handleReturnToPool = () => {
@@ -360,12 +365,6 @@ function DisruptionSimulation({ lessonId, stageIndex, onComplete }: {
   const unplacedLayers = PIZZA_LAYERS.filter(l => !Object.values(placements).includes(l.name));
   const isDone = validated && (isAllCorrect || attempts >= 3);
 
-  const [{ isOverPool }, dropPool] = useDrop({
-    accept: DRAG_PIZZA,
-    drop: () => handleReturnToPool(),
-    collect: m => ({ isOverPool: m.isOver() }),
-  });
-
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-[2rem] border-2 border-[#8B5CF6]/20 shadow-sm overflow-hidden">
@@ -383,27 +382,19 @@ function DisruptionSimulation({ lessonId, stageIndex, onComplete }: {
             {attempts >= 3 ? 'Habis' : `${3 - attempts} percobaan`}
           </div>
         </div>
-        <div className="px-6 py-5 bg-gradient-to-br from-[#8B5CF6]/5 to-transparent">
-          <p className="text-sm text-[#395886]/80 leading-relaxed font-bold">
-            Hint: Pikirkan: layer mana yang fungsinya berkaitan langsung dengan jenis gangguan tersebut?
-          </p>
-        </div>
       </div>
 
-      <div ref={dropPool as unknown as React.Ref<HTMLDivElement>} className={`p-6 rounded-[2.5rem] border-2 border-dashed transition-all duration-300 min-h-[100px]
-        ${isOverPool ? 'border-[#8B5CF6] bg-[#8B5CF6]/10 scale-[0.98] shadow-inner' : 'border-[#D5DEEF] bg-[#F8FAFF]'}`}
-      >
+      <div className={`p-6 rounded-[2.5rem] border-2 border-dashed transition-all duration-300 min-h-[100px] border-[#D5DEEF] bg-[#F8FAFF]`}>
         <div className="flex items-center justify-between mb-4 px-2">
           <p className="text-[10px] font-black uppercase tracking-widest text-[#395886]/40 flex items-center gap-2">
             <GripVertical className="w-3 h-3" /> Kartu Layer ({unplacedLayers.length} tersisa) - Seret ke gangguan yang sesuai
           </p>
-          {isOverPool && <span className="text-[10px] font-black text-[#8B5CF6] animate-bounce">LEPASKAN UNTUK RESET</span>}
         </div>
         <div className="flex flex-wrap gap-3">
           {unplacedLayers.map(l => <DraggableLayerTag key={l.num} name={l.name} layer={l} disabled={validated} />)}
           {unplacedLayers.length === 0 && !validated && (
             <div className="w-full text-center py-4 text-[11px] font-bold text-[#10B981]">
-              Semua kartu sudah diletakkan - Kamu bisa kembali seret ke sini jika ingin mengubah
+              Semua kartu sudah diletakkan - Kamu bisa langsung memindahkannya antar kotak gangguan
             </div>
           )}
         </div>
@@ -454,54 +445,85 @@ function DisruptionSimulation({ lessonId, stageIndex, onComplete }: {
 
 // -- Argumentative Reflection ----------------------------------------------------
 
-function ArgumentativeReflection({ onDone }: { onDone: (essay: string) => void }) {
-  const [essay, setEssay] = useState('');
+// -- Shared UI Components (Constructivism Theme) -------------------------------
+
+function Q_EssayBox({
+  prompt, objectiveLabel, submitLabel, onSubmit, minWords = 15,
+}: {
+  prompt: string; objectiveLabel: string; submitLabel: string; onSubmit: (text: string) => void; minWords?: number;
+}) {
+  const [text, setText] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+  const ready = wordCount >= minWords;
+
   return (
-    <div className="bg-white rounded-[2.5rem] border-2 border-[#D5DEEF] shadow-xl overflow-hidden p-8 animate-in zoom-in-95 duration-500">
-      <div className="flex items-center gap-4 mb-6">
-        <div className="h-12 w-12 rounded-2xl bg-[#628ECB]/10 flex items-center justify-center text-[#628ECB]">
-          <PenLine className="w-6 h-6" />
+    <div className="mt-5 p-6 rounded-[2rem] bg-gradient-to-br from-[#628ECB]/5 to-[#395886]/5 border-2 border-[#628ECB]/20 shadow-inner text-left">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="p-2 rounded-xl bg-[#628ECB]/10 text-[#628ECB]">
+          <PenLine className="w-4 h-4" />
         </div>
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#628ECB]">Refleksi Argumentatif - Logical Thinking</p>
-          <h3 className="text-xl font-black text-[#395886]">Pentingnya Keruntutan Lapisan</h3>
-        </div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-[#628ECB]/60">Refleksi Mandiri — {objectiveLabel}</p>
       </div>
-      
-      <p className="text-sm font-bold text-[#395886]/80 leading-relaxed mb-6 bg-[#F8FAFD] p-5 rounded-2xl border border-[#D5DEEF]">
-        Mengapa proses pengiriman data di internet harus mengikuti urutan lapisan (layer) yang baku? Berikan argumenmu berdasarkan analogi pizza yang telah kamu pelajari!
-      </p>
-
+      <p className="text-sm font-bold text-[#395886] leading-relaxed mb-4">{prompt}</p>
       <textarea
-        value={essay}
-        onChange={e => setEssay(e.target.value)}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
         disabled={submitted}
-        rows={6}
-        className="w-full p-5 rounded-[1.5rem] border-2 border-[#D5DEEF] bg-[#F8FAFD] focus:bg-white focus:border-[#628ECB] focus:ring-4 focus:ring-[#628ECB]/10 outline-none transition-all text-sm font-medium resize-none shadow-inner"
-        placeholder="Tuliskan argumen logismu di sini (minimal 50 karakter)..."
+        rows={4}
+        className="w-full px-5 py-4 border-2 border-[#D5DEEF] rounded-2xl text-sm text-[#395886] focus:outline-none focus:ring-4 focus:ring-[#628ECB]/10 focus:border-[#628ECB] transition-all bg-white/80 backdrop-blur-sm resize-none disabled:bg-[#F0F3FA]/50"
+        placeholder="Tuliskan pemikiran logismu di sini..."
       />
-      
-      <div className="mt-3 flex justify-end">
-        <span className={`text-[10px] font-black uppercase tracking-widest ${essay.length >= 50 ? 'text-[#10B981]' : 'text-[#395886]/30'}`}>
-          {essay.length} karakter{essay.length > 0 && essay.length < 50 ? ` (${50 - essay.length} lagi)` : ''}{essay.length >= 50 ? ' (v)' : ''}
-        </span>
-      </div>
-
-      {!submitted ? (
-        <button 
-          onClick={() => { setSubmitted(true); onDone(essay); }} 
-          disabled={essay.length < 50}
-          className={`mt-6 w-full py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all shadow-lg
-            ${essay.length >= 50 ? 'bg-[#395886] text-white hover:bg-[#2A4468] shadow-[#395886]/20 active:scale-95' : 'bg-[#D5DEEF] text-[#395886]/40 cursor-not-allowed shadow-none'}`}
-        >
-          Kirim Argumen <ArrowRight className="w-5 h-5" />
-        </button>
-      ) : (
-        <div className="mt-6 p-4 bg-[#F0FDF4] border-2 border-[#10B981]/20 rounded-2xl flex items-center justify-center gap-3 text-[#065F46] font-black text-sm">
-          <CheckCircle className="w-6 h-6" /> Argumen Berhasil Terkirim
+      <div className="flex items-center justify-between mt-3 mb-4 px-1">
+        <div className="flex items-center gap-2">
+          <div className={`h-1.5 w-24 rounded-full bg-[#D5DEEF] overflow-hidden`}>
+             <div className={`h-full transition-all duration-500 ${ready ? 'bg-[#10B981]' : 'bg-[#628ECB]'}`} style={{ width: `${Math.min(100, (wordCount / minWords) * 100)}%` }} />
+          </div>
+          <p className={`text-[11px] font-black uppercase tracking-tighter ${ready ? 'text-[#10B981]' : 'text-[#395886]/40'}`}>
+            {wordCount} / {minWords} Kata
+          </p>
         </div>
+        {submitted && (
+          <span className="flex items-center gap-1.5 text-xs font-black text-[#10B981] uppercase tracking-widest">
+            <CheckCircle className="w-4 h-4" /> Tersimpan
+          </span>
+        )}
+      </div>
+      {!submitted && (
+        <button
+          onClick={() => { if (ready) { setSubmitted(true); onSubmit(text.trim()); } }}
+          disabled={!ready}
+          className={`w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-sm transition-all shadow-xl active:scale-95 ${ready ? 'bg-[#395886] text-white hover:bg-[#2A4468] shadow-[#395886]/20' : 'bg-[#D5DEEF] text-[#395886]/40 cursor-not-allowed'}`}
+        >
+          {submitLabel}
+          <ArrowRight className="w-5 h-5" />
+        </button>
       )}
+    </div>
+  );
+}
+
+// -- Disruption Scenarios -------------------------------------------------------
+function ArgumentativeReflection({ onDone }: { onDone: (essay: string) => void }) {
+  return (
+    <div className="bg-white rounded-[2.5rem] border-2 border-[#D5DEEF] shadow-xl overflow-hidden p-8 animate-in zoom-in-95 duration-500 text-center">
+      <div className="flex items-center justify-center gap-4 mb-8">
+        <div className="h-12 w-12 rounded-2xl bg-[#628ECB]/10 flex items-center justify-center text-[#628ECB] shadow-inner">
+          <PenLine className="w-7 h-7" />
+        </div>
+        <div className="text-left">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#628ECB]">Aktivitas X.TCP.5</p>
+          <h3 className="text-xl font-black text-[#395886]">Refleksi Pentingnya Lapisan</h3>
+        </div>
+      </div>
+      
+      <Q_EssayBox 
+        objectiveLabel="X.TCP.5"
+        prompt="Mengapa proses pengiriman data di internet harus mengikuti urutan lapisan (layer) yang baku? Berikan argumenmu berdasarkan analogi pizza yang telah kamu pelajari!"
+        submitLabel="Selesaikan Tahap Questioning"
+        onSubmit={onDone}
+        minWords={25}
+      />
     </div>
   );
 }
@@ -546,7 +568,7 @@ function QuestioningLesson1({ lessonId, stageIndex, onComplete }: QuestioningSta
 
   if (tracker.isLoading || !isRestored) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+      <div className="flex flex-col items-center justify-center py-20 space-y-4 text-center">
         <div className="w-12 h-12 border-4 border-[#8B5CF6] border-t-transparent rounded-full animate-spin" />
         <p className="text-sm font-bold text-[#395886]">Memuat progres...</p>
       </div>
@@ -554,14 +576,14 @@ function QuestioningLesson1({ lessonId, stageIndex, onComplete }: QuestioningSta
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-10 pb-12">
+    <div className="max-w-5xl mx-auto space-y-12 pb-20">
       <div className="flex flex-col md:flex-row items-center gap-8 rounded-[2.5rem] border-2 border-[#8B5CF6]/20 bg-white p-8 shadow-sm">
         <div className="w-24 h-24 shrink-0 rounded-[2rem] bg-[#8B5CF6] flex items-center justify-center text-white shadow-xl">
           <User className="w-12 h-12" strokeWidth={2.5} />
         </div>
         <div className="flex-1 text-center md:text-left">
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8B5CF6]">Questioning - X.TCP.5 (Fasilitator)</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8B5CF6]">Questioning — X.TCP.5 (Fasilitator)</p>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#8B5CF6]/10 border border-[#8B5CF6]/20">
               <MessageSquare className="w-3.5 h-3.5 text-[#8B5CF6]" />
               <span className="text-[10px] font-black text-[#8B5CF6] uppercase tracking-tighter">Diskusi Interaktif</span>
@@ -573,53 +595,32 @@ function QuestioningLesson1({ lessonId, stageIndex, onComplete }: QuestioningSta
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${subPhase === 'map' ? 'bg-[#8B5CF6]' : 'bg-[#10B981]'}`} />
-        <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${subPhase === 'simulation' ? 'bg-[#8B5CF6]' : subPhase === 'essay' ? 'bg-[#10B981]' : 'bg-[#D5DEEF]'}`} />
-        <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${subPhase === 'essay' ? 'bg-[#8B5CF6]' : 'bg-[#D5DEEF]'}`} />
-      </div>
-
-      {subPhase === 'map' && (
-        <div className="space-y-8 animate-in fade-in duration-700">
-          <PizzaLayerMap />
-          <button 
-            onClick={() => { void tracker.trackEvent('questioning_map_completed', {}, { progressPercent: 35 }); setSubPhase('simulation'); }}
-            className="w-full py-5 rounded-[2rem] bg-[#8B5CF6] text-white font-black text-sm hover:bg-[#7C3AED] shadow-xl shadow-purple-200 transition-all active:scale-95 flex items-center justify-center gap-3"
-          >
-            Lanjut ke Simulasi Gangguan
-            <Zap className="w-5 h-5" />
-          </button>
-        </div>
-      )}
-
-      {subPhase === 'simulation' && (
-        <div className="animate-in slide-in-from-bottom-6 duration-700">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[#D5DEEF]" />
-            <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-[#D5DEEF] shadow-sm">
-              <Activity className="w-4 h-4 text-[#8B5CF6]" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#395886]/40 text-center">Analisis Kasus Gangguan</span>
-            </div>
-            <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[#D5DEEF]" />
-          </div>
+      <div className="space-y-12">
+        <PizzaLayerMap />
+        
+        <div className="pt-10 border-t-4 border-dashed border-[#D5DEEF]/30 animate-in fade-in slide-in-from-bottom-6 duration-1000">
           <DisruptionSimulation
             lessonId={lessonId}
             stageIndex={stageIndex}
-            onComplete={(ans) => { setPlacements(ans); void tracker.trackEvent('questioning_simulation_completed', { answerCount: Object.keys(ans ?? {}).length }, { progressPercent: 75 }); setSubPhase('essay'); }}
+            onComplete={(ans) => { 
+               setPlacements(ans); 
+               setSubPhase('essay');
+               void tracker.trackEvent('questioning_simulation_completed', { answerCount: Object.keys(ans ?? {}).length }, { progressPercent: 75 }); 
+            }}
           />
         </div>
-      )}
 
-      {subPhase === 'essay' && (
-        <div className="animate-in zoom-in-95 duration-500">
-          <ArgumentativeReflection onDone={(text) => {
-            setEssay(text);
-            const finalAnswer = { selectedId: 'disruption_simulation', isCorrect: true, askedQuestions: [], justification: text };
-            void tracker.complete(finalAnswer, { subPhase: 'essay', selections, essay: text, finalAnswer });
-            onComplete(finalAnswer);
-          }} />
-        </div>
-      )}
+        {subPhase === 'essay' && (
+          <div className="animate-in fade-in slide-in-from-bottom-6 duration-1000">
+            <ArgumentativeReflection onDone={(text) => {
+              setEssay(text);
+              const finalAnswer = { selectedId: 'disruption_simulation', isCorrect: true, askedQuestions: [], justification: text, summary: text };
+              void tracker.complete(finalAnswer, { subPhase: 'essay', selections, essay: text, finalAnswer });
+              onComplete(finalAnswer);
+            }} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -718,7 +719,7 @@ function QuestioningOriginal({
           <h3 className="text-sm font-bold text-[#395886] mb-4 flex items-center gap-2"><Eye className="w-4 h-4 text-[#628ECB]" /> {teacherQuestion || 'Ajukan pertanyaan untuk mencari bukti:'}</h3>
           <div className="grid sm:grid-cols-2 gap-3 mb-6">
             {questionBank.map(q => (
-              <button key={q.id} onClick={() => handleQuestionClick(q.id)} className={`p-4 rounded-xl border-2 text-left text-xs font-bold transition-all ${activeQuestionId === q.id ? 'border-[#628ECB] bg-[#EEF4FF] text-[#395886]' : 'border-[#D5DEEF] bg-white hover:border-[#628ECB]/40'}`}>
+              <button key={q.id} onClick={() => handleQuestionClick(q.id)} className={`p-4 rounded-xl border-2 text-left text-xs font-bold transition-all ${activeQuestionId === q.id ? 'border-[#628ECB] bg-[#EEF2FF] text-[#395886]' : 'border-[#D5DEEF] bg-white hover:border-[#628ECB]/40'}`}>
                 {q.text}
               </button>
             ))}
@@ -736,7 +737,7 @@ function QuestioningOriginal({
         <h3 className="text-sm font-bold text-[#395886] mb-4 flex items-center gap-2"><Zap className="w-4 h-4 text-[#F59E0B]" /> {whyQuestion || 'Tentukan penyebab utamanya:'}</h3>
         <div className="space-y-3 mb-6">
           {reasonOptions.map(opt => (
-            <button key={opt.id} onClick={() => !validated && setSelectedId(opt.id)} disabled={validated} className={`w-full p-4 rounded-xl border-2 text-left transition-all ${selectedId === opt.id ? (validated ? (opt.isCorrect ? 'border-[#10B981] bg-[#F0FDF4]' : 'border-red-400 bg-red-50') : 'border-[#628ECB] bg-[#EEF4FF]') : 'border-[#D5DEEF] bg-white'}`}>
+            <button key={opt.id} onClick={() => !validated && setSelectedId(opt.id)} disabled={validated} className={`w-full p-4 rounded-xl border-2 text-left transition-all ${selectedId === opt.id ? (validated ? (opt.isCorrect ? 'border-[#10B981] bg-[#F0FDF4]' : 'border-red-400 bg-red-50') : 'border-[#628ECB] bg-[#EEF2FF]') : 'border-[#D5DEEF] bg-white'}`}>
               <p className="text-xs font-bold text-[#395886]">{opt.text}</p>
               {validated && selectedId === opt.id && <p className={`text-[10px] font-bold mt-2 ${opt.isCorrect ? 'text-[#10B981]' : 'text-red-500'}`}>{opt.feedback}</p>}
             </button>

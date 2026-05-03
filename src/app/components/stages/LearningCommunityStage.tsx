@@ -3,40 +3,74 @@ import {
   ChevronRight, CheckCircle, XCircle, Users, Link as LinkIcon, FileSearch,
   MessageSquare, Info, RotateCcw, AlertCircle, ThumbsUp, ArrowUpDown, GripVertical,
   Zap, Database, Cpu, Cable, Network, ShieldCheck, PlayCircle, Eye, ArrowRight,
-  Vote, Award, Sparkles, Monitor, PenLine
+  Vote, Award, Sparkles, Monitor, PenLine, BookOpen, GraduationCap, Lightbulb
 } from 'lucide-react';
 import { getCurrentUser } from '../../utils/auth';
-import { getLessonProgress, saveStageAttempt } from '../../utils/progress';
-import { createGroupDiscussion, getGroupDiscussions, toggleGroupDiscussionVote, type GroupDiscussion } from '../../utils/groups';
+import { 
+  createGroupDiscussion, 
+  getGroupDiscussions, 
+  toggleGroupDiscussionVote, 
+  getGroupMembers, 
+  type GroupDiscussion 
+} from '../../utils/groups';
 import { useActivityTracker } from '../../hooks/useActivityTracker';
+import { TcpIpInteractive } from '../ui/TcpIpInteractive';
+import { StepTracker, ActivityCard, InstructionBox, EssayBox, anim, SectionDivider } from './StageKit';
 
 // -- Types ----------------------------------------------------------------------
+
+interface CaseStudyOption {
+  id: string;
+  text: string;
+  isCorrect?: boolean;
+  logic?: string;
+  description?: string;
+}
 
 interface CaseStudy {
   id: string;
   title: string;
-  description: string;
-  options: { id: string; text: string; isCorrect: boolean }[];
-  correctFeedback: string;
+  concept?: string;
+  description?: string;
+  scenario?: string;
+  question: string;
+  options: CaseStudyOption[];
+  correctFeedback?: string;
 }
 
 interface LearningCommunityStageProps {
   lessonId: string;
   stageIndex: number;
-  moduleId: string; // e.g., 'X.TCP.6'
+  moduleId: string;
   groupName?: string;
   onComplete: (answer: any) => void;
   isCompleted?: boolean;
+  layers5?: Array<{ id: string; name: string; pdu: string; color: string; desc: string }>;
+  encapsulationCase?: CaseStudy;
+  decapsulationCase?: CaseStudy;
 }
 
-// -- Animation variants ---------------------------------------------------------
-const anim = {
-  fadeIn: 'animate-in fade-in duration-500',
-  fadeUp: 'animate-in fade-in slide-in-from-bottom-4 duration-500',
-  zoomIn: 'animate-in fade-in zoom-in-95 duration-500',
-};
+// -- Shared UI Components -------------------------------------------------------
 
-// -- Module Phase 1: Concept ----------------------------------------------------
+function GroupMembersList({ members, submissions = [] }: { members: { user_id: string; user_name: string }[]; submissions?: string[] }) {
+  return (
+    <div className="flex flex-wrap gap-2 justify-center mb-6">
+      {members.map((m, i) => {
+        const hasSubmitted = submissions.includes(m.user_id);
+        return (
+          <div key={m.user_id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border-2 transition-all ${hasSubmitted ? 'border-[#10B981] bg-[#F0FDF4]' : 'border-[#D5DEEF]'}`}>
+             <div className={`w-2 h-2 rounded-full ${hasSubmitted ? 'bg-[#10B981]' : 'bg-[#D5DEEF]'} ${!hasSubmitted && 'animate-pulse'}`} />
+             <span className={`text-[9px] font-black uppercase tracking-tight ${hasSubmitted ? 'text-[#065F46]' : 'text-[#395886]'}`}>{m.user_name}</span>
+             {hasSubmitted && <CheckCircle className="w-3 h-3 text-[#10B981]" />}
+          </div>
+        );
+      })}
+      {members.length === 0 && <p className="text-[10px] font-bold text-[#395886]/30 uppercase italic">Menunggu anggota lain...</p>}
+    </div>
+  );
+}
+
+// -- Phase 1: Concept -----------------------------------------------------------
 
 function ConceptPhase({
   title, concept, layers, isEncapsulation, onNext,
@@ -44,270 +78,318 @@ function ConceptPhase({
   title: string; concept: string; layers: any[]; isEncapsulation: boolean; onNext: () => void;
 }) {
   return (
-    <div className={`space-y-5 ${anim.fadeUp}`}>
-      <div className="relative overflow-hidden rounded-2xl border-2 border-[#628ECB]/20 bg-white p-5 shadow-sm">
-        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#628ECB] mb-1.5">Konsep Dasar</p>
-        <h3 className="text-base font-bold text-[#395886] mb-2">{title}</h3>
-        <p className="text-sm leading-relaxed text-[#395886]/75 relative z-10">{concept}</p>
-      </div>
-
-      <div className="bg-white rounded-[2rem] border-2 border-[#D5DEEF] p-8 shadow-sm">
-        <div className="flex flex-col items-center gap-6">
-          <p className="text-[10px] font-black uppercase tracking-widest text-[#395886]/40">Visualisasi Alur Data</p>
-          <div className="flex flex-col gap-2 w-full max-w-sm">
+    <div className={`space-y-6 ${anim.fadeUp}`}>
+      <ActivityCard
+        icon={<GraduationCap className="w-5 h-5 text-[#10B981]" />}
+        label="Konsep Inti"
+        title={title}
+        headerBg="bg-[#10B981]/5"
+        headerBorder="border-[#10B981]/20"
+        iconBg="bg-[#10B981]/10"
+        labelCls="text-[#10B981]"
+      >
+        <div className="space-y-6">
+          <p className="text-sm font-medium text-[#395886]/80 leading-relaxed">
+            {concept}
+          </p>
+          
+          <SectionDivider label="Struktur Lapisan" icon={<Database className="w-3 h-3" />} />
+          
+          <div className="flex flex-col gap-2 max-w-sm mx-auto w-full">
             {layers.map((layer, idx) => (
-              <div key={idx} className={`flex items-center gap-3 p-4 rounded-2xl border-2 border-[#D5DEEF] bg-[#F8FAFD] transition-all`}>
-                <div className="h-8 w-8 rounded-lg bg-[#395886] text-white flex items-center justify-center font-black text-xs">{isEncapsulation ? idx + 1 : layers.length - idx}</div>
-                <span className="text-sm font-bold text-[#395886]">{layer}</span>
+              <div key={idx} className={`flex items-center gap-4 p-4 rounded-2xl border-2 border-[#D5DEEF] bg-[#F8FAFD] hover:border-[#628ECB]/30 transition-all`}>
+                <div className="h-8 w-8 rounded-xl bg-[#395886] text-white flex items-center justify-center font-black text-xs shadow-sm">
+                  {isEncapsulation ? idx + 1 : layers.length - idx}
+                </div>
+                <span className="text-sm font-bold text-[#395886]">{layer.name || layer}</span>
               </div>
             ))}
           </div>
-          <div className="mt-4 flex flex-col items-center gap-2">
-            <div className={`h-12 w-1 w-1 bg-gradient-to-b ${isEncapsulation ? 'from-[#395886] to-[#10B981]' : 'from-[#10B981] to-[#395886]'} rounded-full`} />
-            <span className="text-[10px] font-black uppercase tracking-widest text-[#10B981]">{isEncapsulation ? 'Proses Membungkus' : 'Proses Membuka'}</span>
-          </div>
-        </div>
-      </div>
 
-      <button onClick={onNext} className="w-full py-4 rounded-2xl bg-[#395886] text-white font-black text-sm hover:bg-[#2A4468] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2">
-        Pahami Studi Kasus <ChevronRight className="w-4 h-4" />
+          <InstructionBox accent="text-[#10B981]">
+            Data akan diproses secara berurutan {isEncapsulation ? 'dari atas ke bawah (Enkapsulasi)' : 'dari bawah ke atas (Dekapsulasi)'}.
+          </InstructionBox>
+        </div>
+      </ActivityCard>
+
+      <button onClick={onNext} className="w-full py-5 rounded-2xl bg-[#395886] text-white font-black text-sm hover:bg-[#2A4468] transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 group">
+        Mulai Analisis Skenario <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
       </button>
     </div>
   );
 }
 
-// -- Module Phase 2: Case Study -------------------------------------------------
+// -- Phase 2: Case Study + Argument Input --------------------------------------
 
-function CasePhase({ study, onNext }: { study: CaseStudy; onNext: (choiceId: string, choiceText: string) => void }) {
+function CasePhase({ study, isSubmitted, onNext }: { study: CaseStudy; isSubmitted?: boolean; onNext: (choiceId: string, choiceText: string, argument: string) => void }) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [argument, setArgument] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const ready = selected && argument.trim().length >= 15;
+
   return (
     <div className={`space-y-6 ${anim.zoomIn}`}>
-      <div className="bg-white rounded-[2rem] border-2 border-[#F59E0B]/20 p-8 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-10 w-10 rounded-xl bg-[#F59E0B]/10 flex items-center justify-center text-[#F59E0B]"><FileSearch className="w-6 h-6" /></div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#F59E0B]">Studi Kasus Kelompok</p>
-            <h3 className="text-base font-bold text-[#395886]">{study.title}</h3>
+      <ActivityCard
+        icon={<FileSearch className="w-5 h-5 text-[#F59E0B]" />}
+        label="Misi Analisis"
+        title={study.title}
+        headerBg="bg-[#F59E0B]/5"
+        headerBorder="border-[#F59E0B]/20"
+        iconBg="bg-[#F59E0B]/10"
+        labelCls="text-[#F59E0B]"
+      >
+        <div className="space-y-6">
+          <InstructionBox accent="text-[#F59E0B]">
+            <span className="italic">"{study.scenario || study.description}"</span>
+          </InstructionBox>
+
+          <p className="text-sm font-bold text-[#395886] px-1">{study.question}</p>
+
+          <div className="grid gap-3">
+            {study.options.map(opt => (
+              <button
+                key={opt.id}
+                disabled={isSubmitted}
+                onClick={() => setSelected(opt.id)}
+                className={`p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${selected === opt.id ? 'border-[#F59E0B] bg-[#FFFBEB] shadow-sm scale-[1.01]' : 'border-[#D5DEEF] bg-white hover:border-[#F59E0B]/30'} ${isSubmitted && selected !== opt.id ? 'opacity-50' : ''}`}
+              >
+                <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors ${selected === opt.id ? 'border-[#F59E0B]' : 'border-[#D5DEEF]'}`}>
+                  {selected === opt.id && <div className="h-2.5 w-2.5 rounded-full bg-[#F59E0B]" />}
+                </div>
+                <span className={`text-xs font-bold ${selected === opt.id ? 'text-[#395886]' : 'text-[#395886]/60'}`}>{opt.text}</span>
+              </button>
+            ))}
           </div>
+
+          {(selected || isSubmitted) && (
+            <div className={`space-y-3 p-5 rounded-2xl bg-[#F8FAFD] border-2 border-[#D5DEEF]/60 ${anim.fadeUp}`}>
+              <div className="flex items-center gap-2">
+                <PenLine className="w-4 h-4 text-[#395886]/60" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#395886]/60">Argumen Logismu</p>
+              </div>
+              <textarea
+                value={argument}
+                readOnly={isSubmitted}
+                onChange={e => setArgument(e.target.value)}
+                rows={3}
+                className={`w-full p-4 border-2 border-[#D5DEEF] rounded-xl text-sm text-[#395886] focus:border-[#F59E0B] focus:ring-4 focus:ring-[#F59E0B]/5 outline-none transition-all resize-none ${isSubmitted ? 'bg-[#F1F5F9] border-dashed cursor-not-allowed' : 'bg-white'}`}
+                placeholder="Jelaskan alasan teknismu di sini..."
+              />
+              <div className="flex justify-between items-center">
+                {isSubmitted ? (
+                  <div className="flex items-center gap-1.5 text-[#10B981] font-black text-[10px] uppercase">
+                    <CheckCircle className="w-3.5 h-3.5" /> Argumen Berhasil Dikirim ke Kelompok
+                  </div>
+                ) : (
+                  <p className={`text-[10px] font-bold ${argument.trim().length >= 15 ? 'text-[#10B981]' : 'text-[#395886]/30'}`}>
+                    {argument.trim().length} / 15 Karakter Minimal
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-        <p className="text-sm text-[#395886]/80 leading-relaxed font-medium mb-8 bg-[#FFFBEB] p-5 rounded-2xl border border-[#F59E0B]/10 italic">"{study.description}"</p>
-        <div className="grid gap-3">
-          {study.options.map(opt => (
-            <button key={opt.id} onClick={() => setSelected(opt.id)} className={`p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${selected === opt.id ? 'border-[#F59E0B] bg-[#FFFBEB] shadow-md' : 'border-[#D5DEEF] bg-white hover:border-[#F59E0B]/30'}`}>
-              <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${selected === opt.id ? 'border-[#F59E0B]' : 'border-[#D5DEEF]'}`}>{selected === opt.id && <div className="h-2 w-2 rounded-full bg-[#F59E0B]" />}</div>
-              <span className={`text-xs font-bold ${selected === opt.id ? 'text-[#395886]' : 'text-[#395886]/60'}`}>{opt.text}</span>
-            </button>
-          ))}
+      </ActivityCard>
+
+      {!isSubmitted ? (
+        <button
+          onClick={async () => {
+            if (ready) {
+              setIsSubmitting(true);
+              const choiceText = study.options.find(o => o.id === selected)!.text;
+              await onNext(selected, choiceText, argument.trim());
+              setIsSubmitting(false);
+            }
+          }}
+          disabled={!ready || isSubmitting}
+          className={`w-full py-5 rounded-2xl font-black text-sm shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2
+            ${ready ? 'bg-[#395886] text-white hover:bg-[#2A4468]' : 'bg-[#D5DEEF] text-[#395886]/40 cursor-not-allowed'}`}
+        >
+          {isSubmitting ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+          {isSubmitting ? 'Mengirim...' : 'Submit Argumen ke Kelompok'}
+        </button>
+      ) : (
+        <div className={`p-4 rounded-2xl bg-[#10B981]/10 border-2 border-[#10B981]/20 flex items-center justify-center gap-3 ${anim.fadeUp}`}>
+           <Sparkles className="w-5 h-5 text-[#10B981]" />
+           <p className="text-sm font-black text-[#065F46] uppercase tracking-tight">Menuju Papan Diskusi...</p>
         </div>
-      </div>
-      <button onClick={() => selected && onNext(selected, study.options.find(o => o.id === selected)!.text)} disabled={!selected} className="w-full py-4 rounded-2xl bg-[#F59E0B] text-white font-black text-sm shadow-xl disabled:bg-[#D5DEEF] disabled:shadow-none transition-all active:scale-95">Masuk ke Ruang Diskusi</button>
+      )}
     </div>
   );
 }
 
-// -- Module Phase 3: Discussion -------------------------------------------------
+// -- Phase 3: Group Discussion & Voting -----------------------------------------
 
 function DiscussionPhase({
-  lessonId, moduleId, groupName, initialChoice, onNext,
+  lessonId, moduleId, groupName, onNext,
 }: {
-  lessonId: string; moduleId: string; groupName: string; initialChoice: { id: string; text: string }; onNext: () => void;
+  lessonId: string; moduleId: string; groupName: string; onNext: () => void;
 }) {
   const user = getCurrentUser();
-  const [argument, setArgument] = useState('');
   const [discussions, setDiscussions] = useState<GroupDiscussion[]>([]);
-  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [members, setMembers] = useState<{ user_id: string; user_name: string }[]>([]);
+  
+  const submissions = useMemo(() => discussions.map(d => d.user_id), [discussions]);
+  const missingMembers = useMemo(() => 
+    members.filter(m => !submissions.includes(m.user_id)).map(m => m.user_name),
+    [members, submissions]
+  );
+  const allSubmitted = members.length > 0 && missingMembers.length === 0;
 
   useEffect(() => {
-    void fetchDiscussions();
-  }, [groupName, lessonId, moduleId, user?.id]);
-
-  const fetchDiscussions = async () => {
-    const data = await getGroupDiscussions(lessonId, moduleId, groupName);
-    setDiscussions(data);
-    setHasSubmitted(data.some((d) => d.user_id === user!.id));
-  };
-
-  const submitArgument = async () => {
-    if (argument.trim().length < 10) return;
-    await createGroupDiscussion({
-      lesson_id: lessonId,
-      module_id: moduleId,
-      group_name: groupName,
-      user_id: user!.id,
-      user_name: user!.name,
-      argument: argument.trim(),
-      choice_id: initialChoice.id,
-      choice_text: initialChoice.text,
-    });
-    setArgument('');
-    await fetchDiscussions();
-  };
+    const fetch = async () => {
+      const [d, m] = await Promise.all([
+        getGroupDiscussions(lessonId, moduleId, groupName),
+        getGroupMembers(groupName)
+      ]);
+      setDiscussions(d);
+      setMembers(m);
+    };
+    void fetch();
+    const interval = setInterval(fetch, 4000);
+    return () => clearInterval(interval);
+  }, [groupName, lessonId, moduleId]);
 
   const handleVote = async (discId: string) => {
+    if (!allSubmitted) return;
     await toggleGroupDiscussionVote(discId, user!.id);
-    await fetchDiscussions();
+    const updated = await getGroupDiscussions(lessonId, moduleId, groupName);
+    setDiscussions(updated);
   };
 
   return (
     <div className={`space-y-6 ${anim.fadeUp}`}>
-      <div className="bg-white rounded-[2rem] border-2 border-[#10B981]/20 p-8 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-10 w-10 rounded-xl bg-[#10B981]/10 flex items-center justify-center text-[#10B981]"><MessageSquare className="w-6 h-6" /></div>
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#10B981]">Ruang Diskusi - {groupName}</p>
-            <h3 className="text-sm font-bold text-[#395886]">Berbagi Argumen dan Voting</h3>
+      <ActivityCard
+        icon={<MessageSquare className="w-5 h-5 text-[#10B981]" />}
+        label="Kolaborasi Kelompok"
+        title={`Konsensus Argumen — ${groupName}`}
+        headerBg="bg-[#10B981]/5"
+        headerBorder="border-[#10B981]/20"
+        iconBg="bg-[#10B981]/10"
+        labelCls="text-[#10B981]"
+      >
+        <div className="space-y-6">
+          <GroupMembersList members={members} submissions={submissions} />
+
+          <SectionDivider label="Papan Diskusi" icon={<ArrowUpDown className="w-3 h-3" />} />
+
+          <div className="flex items-center justify-center mb-4">
+             {!allSubmitted ? (
+               <div className="px-5 py-2.5 rounded-2xl bg-amber-50 text-amber-600 text-[10px] font-black uppercase border border-amber-100 flex flex-col items-center gap-2 text-center">
+                 <div className="flex items-center gap-2">
+                    <RotateCcw className="w-3.5 h-3.5 animate-spin" /> 
+                    <span>Menunggu Argumen Anggota...</span>
+                 </div>
+                 <p className="text-[9px] lowercase font-bold text-amber-500/80">
+                   Belum mengirim: {missingMembers.length > 0 ? missingMembers.join(', ') : '...'}
+                 </p>
+               </div>
+             ) : (
+               <div className="px-4 py-1.5 rounded-full bg-[#10B981]/10 text-[#10B981] text-[10px] font-black uppercase border border-[#10B981]/20 flex items-center gap-2">
+                 <CheckCircle className="w-3.5 h-3.5" /> Voting Dibuka
+               </div>
+             )}
+          </div>
+          
+          <div className="grid gap-4">
+            {discussions.map(disc => (
+              <div key={disc.id} className={`p-5 rounded-2xl border-2 transition-all duration-500 ${disc.user_id === user!.id ? 'border-[#10B981]/40 bg-[#F0FDF4]/50 shadow-sm' : 'border-[#D5DEEF] bg-white hover:border-[#10B981]/20'}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                     <div className={`w-9 h-9 rounded-xl ${disc.user_id === user!.id ? 'bg-[#10B981]' : 'bg-[#395886]'} text-white flex items-center justify-center text-[10px] font-black shadow-sm`}>{disc.user_name.substring(0,2).toUpperCase()}</div>
+                     <div>
+                        <p className="text-xs font-black text-[#395886]">{disc.user_name} {disc.user_id === user!.id && <span className="text-[9px] font-black bg-[#10B981] text-white px-2 py-0.5 rounded-full ml-1 uppercase">Kamu</span>}</p>
+                        <p className="text-[10px] font-bold text-[#395886]/40 uppercase tracking-tight">Memilih: {disc.choice_text}</p>
+                     </div>
+                  </div>
+                  <button 
+                    onClick={() => handleVote(disc.id)} 
+                    disabled={!allSubmitted}
+                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border-2 transition-all active:scale-90 ${disc.votes.includes(user!.id) ? 'bg-[#10B981] text-white border-[#10B981] shadow-md shadow-[#10B981]/20' : 'bg-white text-[#395886]/40 border-[#D5DEEF] hover:border-[#10B981]/50'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                     <ThumbsUp className={`w-3.5 h-3.5 ${disc.votes.includes(user!.id) ? 'fill-current' : ''}`} /> <span className="text-[10px] font-black">{disc.votes.length} Vote</span>
+                  </button>
+                </div>
+                <p className="text-sm font-medium text-[#395886]/80 leading-relaxed italic bg-white/60 p-3.5 rounded-xl border border-current/5">
+                  "{disc.argument}"
+                </p>
+              </div>
+            ))}
+            {discussions.length === 0 && (
+              <div className="py-16 text-center bg-[#F8FAFD] rounded-2xl border-2 border-dashed border-[#D5DEEF] text-[10px] font-black text-[#395886]/30 uppercase tracking-widest">
+                Belum ada argumen masuk...
+              </div>
+            )}
           </div>
         </div>
-
-        {!hasSubmitted ? (
-          <div className="space-y-4 mb-10 bg-[#F0FDF4] p-6 rounded-[1.5rem] border border-[#10B981]/10">
-            <p className="text-xs font-bold text-[#065F46]">Tulis argumenmu mengapa memilih jawaban tersebut:</p>
-            <textarea value={argument} onChange={e => setArgument(e.target.value)} rows={3} className="w-full p-4 rounded-xl border-2 border-[#D5DEEF] text-sm focus:border-[#10B981] outline-none" placeholder="Contoh: Saya memilih ini karena pada layer..." />
-            <button onClick={submitArgument} disabled={argument.trim().length < 10} className="w-full py-3 rounded-xl bg-[#10B981] text-white font-black text-sm shadow-md disabled:bg-[#D5DEEF]">Kirim Argumen Saya</button>
-          </div>
-        ) : (
-          <div className="space-y-4 mb-8">
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#395886]/40 px-2">Daftar Argumen Anggota</p>
-            <div className="grid gap-4">
-              {discussions.map(disc => (
-                <div key={disc.id} className={`p-5 rounded-2xl border-2 transition-all ${disc.user_id === user!.id ? 'border-[#10B981] bg-[#F0FDF4]' : 'border-[#D5DEEF] bg-[#F8FAFF]'}`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                       <div className="w-8 h-8 rounded-lg bg-[#395886] text-white flex items-center justify-center text-[10px] font-black">{disc.user_name.substring(0,2).toUpperCase()}</div>
-                       <span className="text-xs font-black text-[#395886]">{disc.user_name} {disc.user_id === user!.id && '(Kamu)'}</span>
-                    </div>
-                    <button onClick={() => handleVote(disc.id)} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 transition-all ${disc.votes.includes(user!.id) ? 'bg-[#10B981] text-white border-[#10B981]' : 'bg-white text-[#395886]/40 border-[#D5DEEF] hover:border-[#10B981]'}`}>
-                       <ThumbsUp className="w-3.5 h-3.5" /> <span className="text-[10px] font-black">{disc.votes.length} Vote</span>
-                    </button>
-                  </div>
-                  <p className="text-xs font-bold text-[#395886]/70 leading-relaxed italic">"{disc.argument}"</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-      {hasSubmitted && <button onClick={onNext} className="w-full py-4 rounded-2xl bg-[#395886] text-white font-black text-sm shadow-xl active:scale-95">Lihat Hasil Voting Kelompok</button>}
+      </ActivityCard>
+      
+      {allSubmitted && (
+        <button onClick={onNext} className="w-full py-5 rounded-2xl bg-[#395886] text-white font-black text-sm shadow-xl active:scale-95 transition-all hover:bg-[#2A4468] flex items-center justify-center gap-2 group">
+          Lihat Hasil Keputusan <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+        </button>
+      )}
     </div>
   );
 }
 
-// -- Module Phase 4: Result -----------------------------------------------------
+// -- Phase 4: Activity Result --------------------------------------------------
 
-function ResultPhase({ discussions, onDone }: { discussions: GroupDiscussion[]; onDone: () => void }) {
-  const bestArgument = discussions[0];
+function ResultPhase({ moduleId, discussions, onDone }: { moduleId: string; discussions: GroupDiscussion[]; onDone: () => void }) {
+  const sorted = [...discussions].sort((a, b) => b.votes.length - a.votes.length);
+  const bestArgument = sorted[0];
   if (!bestArgument) return null;
+  
   return (
     <div className={`space-y-6 ${anim.zoomIn}`}>
-      <div className="bg-white rounded-[2.5rem] border-2 border-[#D5DEEF] shadow-xl overflow-hidden">
-        <div className="px-8 py-6 bg-gradient-to-br from-[#395886] to-[#628ECB] text-white">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md shadow-lg ring-1 ring-white/30">
-              <Award className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60 mb-1">Hasil Voting Kelompok</p>
-              <h3 className="text-xl font-black tracking-tight">Konsensus Jawaban Terbaik</h3>
-            </div>
-          </div>
-        </div>
+      <ActivityCard
+        icon={<Award className="w-5 h-5 text-[#F59E0B]" />}
+        label="Keputusan Akhir"
+        title={`Argumen Terbaik — ${moduleId}`}
+        headerBg="bg-[#F59E0B]/5"
+        headerBorder="border-[#F59E0B]/20"
+        iconBg="bg-[#F59E0B]/10"
+        labelCls="text-[#F59E0B]"
+      >
+        <div className="space-y-6">
+          <InstructionBox accent="text-[#395886]">
+            Berdasarkan voting internal, argumen berikut dianggap paling tepat oleh kelompokmu.
+          </InstructionBox>
 
-        <div className="p-8 space-y-4">
-          <p className="text-sm font-medium text-[#395886]/60 leading-relaxed mb-4">
-            Berdasarkan hasil voting, berikut adalah urutan argumen anggota kelompok dari yang paling relevan secara teknis.
-          </p>
-
-          <div className="space-y-4">
-            {discussions.map((disc, idx) => (
-              <div
-                key={disc.id}
-                className={`p-5 rounded-[1.5rem] border-2 transition-all duration-300 ${
-                  idx === 0
-                    ? 'border-[#F59E0B] bg-[#FFFBEB] shadow-md scale-[1.01]'
-                    : 'border-[#D5DEEF] bg-[#F8FAFF]'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black text-white shadow-md ${idx === 0 ? 'bg-[#F59E0B]' : 'bg-[#628ECB]'}`}>
-                      {disc.user_name.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-sm font-black text-[#395886]">{disc.user_name}</p>
-                      <div className="flex items-center gap-1.5">
-                        <Vote className={`w-3.5 h-3.5 ${idx === 0 ? 'text-[#F59E0B]' : 'text-[#628ECB]'}`} />
-                        <span className={`text-[10px] font-black uppercase ${idx === 0 ? 'text-[#F59E0B]' : 'text-[#628ECB]'}`}>{disc.votes.length} Suara</span>
-                      </div>
-                    </div>
-                  </div>
-                  {idx === 0 && (
-                    <div className="flex items-center gap-1.5 bg-[#F59E0B] text-white px-3 py-1 rounded-full shadow-sm">
-                      <Sparkles className="w-3 h-3" />
-                      <span className="text-[9px] font-black uppercase tracking-widest">Pilihan Utama</span>
-                    </div>
-                  )}
-                </div>
-                <div className="bg-white/60 p-4 rounded-xl border border-current/5 italic text-sm text-[#395886] leading-relaxed font-medium">
-                  "{disc.argument}"
+          <div className="p-6 rounded-[2rem] border-2 border-[#F59E0B] bg-[#FFFBEB] shadow-sm relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity"><Award className="w-20 h-20 text-[#F59E0B]" /></div>
+            <div className="flex items-center gap-3 mb-4 relative z-10">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[10px] font-black text-white shadow-md bg-[#F59E0B]">
+                {bestArgument.user_name.substring(0, 2).toUpperCase()}
+              </div>
+              <div>
+                <p className="text-sm font-black text-[#395886]">{bestArgument.user_name}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <ThumbsUp className="w-3 h-3 text-[#F59E0B]" />
+                  <span className="text-[10px] font-black uppercase text-[#F59E0B]">{bestArgument.votes.length} Suara Kelompok</span>
                 </div>
               </div>
-            ))}
+            </div>
+            <p className="text-sm font-bold text-[#395886] leading-relaxed relative z-10 italic">
+              "{bestArgument.argument}"
+            </p>
           </div>
 
-          <div className="mt-6 p-5 rounded-2xl bg-[#F0FDF4] border-2 border-[#10B981]/20 flex items-start gap-4">
-            <div className="h-10 w-10 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0">
-              <CheckCircle className="w-6 h-6 text-[#10B981]" />
-            </div>
-            <div>
-              <p className="text-xs font-black text-[#065F46] uppercase tracking-widest mb-1">Panduan Belajar</p>
-              <p className="text-[13px] font-bold text-[#065F46]/80 leading-relaxed">
-                Pelajari argumen <span className="text-[#F59E0B]">Pilihan Utama</span> sebagai referensi pemahaman kelompokmu. Kamu bisa berdiskusi lebih lanjut secara luring untuk memperdalam konsep ini.
-              </p>
-            </div>
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-[#F0FDF4] border border-[#10B981]/20">
+            <CheckCircle className="w-4 h-4 text-[#10B981] mt-0.5 shrink-0" />
+            <p className="text-xs font-bold text-[#065F46]/80 leading-relaxed">
+              Argumen ini akan menjadi dasar pemahamanmu untuk aktivitas selanjutnya.
+            </p>
           </div>
         </div>
-      </div>
+      </ActivityCard>
 
       <button
         onClick={onDone}
-        className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-[#395886] text-white font-black text-sm hover:bg-[#2A4468] shadow-xl shadow-[#395886]/20 transition-all active:scale-95 group"
+        className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl bg-[#395886] text-white font-black text-sm hover:bg-[#2A4468] shadow-xl transition-all active:scale-95 group"
       >
-        Lanjutkan Aktivitas Berikutnya
-        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+        Lanjutkan Aktivitas <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
       </button>
-    </div>
-  );
-}
-
-// -- Module Overall Result ------------------------------------------------------
-
-function OverallResult({ lessonId, groupName, onComplete }: { lessonId: string; groupName: string; onComplete: (essay: string) => void }) {
-  const [essay, setEssay] = useState('');
-  return (
-    <div className={`space-y-8 ${anim.fadeUp}`}>
-      <div className="bg-white rounded-[2rem] border-2 border-[#D5DEEF] p-8 shadow-sm text-center">
-         <div className="w-20 h-20 rounded-full bg-[#10B981]/10 flex items-center justify-center text-[#10B981] mx-auto mb-6"><Award className="w-10 h-10" /></div>
-         <h3 className="text-2xl font-black text-[#395886] mb-2 uppercase tracking-tight">Hasil Keseluruhan Kelompok</h3>
-         <p className="text-sm font-bold text-[#395886]/40 leading-relaxed mb-10">Berikut adalah rangkuman perjalanan kelompok <span className="text-[#628ECB]">{groupName}</span> dalam menganalisis alur data TCP/IP.</p>
-         
-         <div className="grid sm:grid-cols-2 gap-4 text-left mb-10">
-            <div className="p-5 rounded-2xl bg-[#F0FDF4] border border-[#10B981]/20">
-               <p className="text-[10px] font-black text-[#10B981] uppercase mb-1">Misi Enkapsulasi</p>
-               <p className="text-xs font-bold text-[#065F46]/80">Berhasil memetakan pembungkusan data dari layer atas ke bawah.</p>
-            </div>
-            <div className="p-5 rounded-2xl bg-[#EEF2FF] border border-[#628ECB]/20">
-               <p className="text-[10px] font-black text-[#628ECB] uppercase mb-1">Misi Dekapsulasi</p>
-               <p className="text-xs font-bold text-[#395886]/80">Berhasil memetakan pembukaan data di sisi penerima secara logis.</p>
-            </div>
-         </div>
-
-         <div className="space-y-4 text-left">
-            <label className="flex items-center gap-2 text-xs font-black text-[#628ECB] uppercase tracking-widest ml-1"><PenLine className="w-4 h-4" /> Kesimpulan Akhir Individu</label>
-            <textarea value={essay} onChange={e => setEssay(e.target.value)} rows={4} className="w-full p-5 rounded-[1.5rem] border-2 border-[#D5DEEF] text-sm focus:border-[#628ECB] outline-none bg-[#F8FAFD]" placeholder="Tuliskan kesimpulan pribadimu tentang kolaborasi hari ini..." />
-         </div>
-         
-         <button onClick={() => onComplete(essay)} disabled={essay.length < 30} className="w-full mt-8 py-4 rounded-2xl bg-[#10B981] text-white font-black text-sm shadow-xl disabled:bg-[#D5DEEF] transition-all">Selesaikan Tahap Learning Community</button>
-      </div>
     </div>
   );
 }
@@ -317,85 +399,255 @@ function OverallResult({ lessonId, groupName, onComplete }: { lessonId: string; 
 function ModuleFlow({ 
   lessonId, moduleId, groupName, title, concept, layers, study, isEncapsulation, onModuleDone 
 }: { 
-  lessonId: string; moduleId: string; groupName: string; title: string; concept: string; layers: string[]; study: CaseStudy; isEncapsulation: boolean; onModuleDone: (data: any) => void 
+  lessonId: string; moduleId: string; groupName: string; title: string; concept: string; layers: any[]; study: CaseStudy; isEncapsulation: boolean; onModuleDone: (data: any) => void 
 }) {
   const [phase, setPhase] = useState<'concept' | 'case' | 'discussion' | 'result'>('concept');
-  const [initialChoice, setInitialChoice] = useState<{ id: string; text: string } | null>(null);
   const [discussions, setDiscussions] = useState<GroupDiscussion[]>([]);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const user = getCurrentUser();
 
-  const fetchResults = async () => {
-    const data = await getGroupDiscussions(lessonId, moduleId, groupName);
-    setDiscussions([...data].sort((a, b) => b.votes.length - a.votes.length));
+  const handleCaseSubmit = async (choiceId: string, choiceText: string, argument: string) => {
+    try {
+      await createGroupDiscussion({
+        lesson_id: lessonId,
+        module_id: moduleId,
+        group_name: groupName,
+        user_id: user!.id,
+        user_name: user!.name,
+        argument: argument,
+        choice_id: choiceId,
+        choice_text: choiceText,
+      });
+      setIsSubmitted(true);
+      // Berikan jeda agar siswa bisa melihat status "Berhasil Terkirim"
+      setTimeout(() => {
+        setPhase('discussion');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to submit argument:', err);
+    }
   };
 
-  if (phase === 'concept') return <ConceptPhase title={title} concept={concept} layers={layers} isEncapsulation={isEncapsulation} onNext={() => setPhase('case')} />;
-  if (phase === 'case') return <CasePhase study={study} onNext={(id, text) => { setInitialChoice({ id, text }); setPhase('discussion'); }} />;
-  if (phase === 'discussion') return <DiscussionPhase lessonId={lessonId} moduleId={moduleId} groupName={groupName} initialChoice={initialChoice!} onNext={async () => { await fetchResults(); setPhase('result'); }} />;
-  if (phase === 'result') return <ResultPhase discussions={discussions} onDone={() => onModuleDone({ discussions, choice: initialChoice })} />;
-  return null;
+  const finalizeModule = async () => {
+    const data = await getGroupDiscussions(lessonId, moduleId, groupName);
+    setDiscussions(data);
+    setPhase('result');
+  };
+
+  const handleResultDone = () => {
+    const sorted = [...discussions].sort((a, b) => b.votes.length - a.votes.length);
+    onModuleDone({ bestArgument: sorted[0], discussions });
+  };
+
+  const steps = ['Konsep', 'Kasus', 'Diskusi', 'Hasil'];
+  const currentStep = phase === 'concept' ? 0 : phase === 'case' ? 1 : phase === 'discussion' ? 2 : 3;
+
+  return (
+    <div className="w-full space-y-6">
+      <StepTracker steps={steps} current={currentStep} />
+      {phase === 'concept' && <ConceptPhase title={title} concept={concept} layers={layers} isEncapsulation={isEncapsulation} onNext={() => setPhase('case')} />}
+      {phase === 'case' && <CasePhase study={study} isSubmitted={isSubmitted} onNext={handleCaseSubmit} />}
+      {phase === 'discussion' && <DiscussionPhase lessonId={lessonId} moduleId={moduleId} groupName={groupName} onNext={finalizeModule} />}
+      {phase === 'result' && <ResultPhase moduleId={moduleId} discussions={discussions} onDone={handleResultDone} />}
+    </div>
+  );
+}
+
+// -- Overall Group Result -------------------------------------------------------
+
+function OverallGroupResult({ module1Data, module2Data, groupName, onNext }: { module1Data: any; module2Data: any; groupName: string; onNext: () => void }) {
+  return (
+    <div className={`space-y-6 ${anim.zoomIn} w-full`}>
+      <ActivityCard
+        icon={<Users className="w-5 h-5 text-[#628ECB]" />}
+        label="Hasil Kolaborasi"
+        title="Ringkasan Kesepakatan Kelompok"
+        headerBg="bg-[#628ECB]/5"
+        headerBorder="border-[#628ECB]/20"
+        iconBg="bg-[#628ECB]/10"
+        labelCls="text-[#628ECB]"
+      >
+        <div className="space-y-8 text-center">
+          <p className="text-sm font-bold text-[#395886]/60 leading-relaxed px-4">
+            Berikut adalah poin-poin kesepakatan terbaik kelompok <span className="text-[#628ECB] font-black">{groupName}</span> untuk setiap aktivitas.
+          </p>
+          
+          <div className="grid md:grid-cols-2 gap-6 text-left">
+            <div className="p-5 rounded-2xl border-2 border-[#10B981]/20 bg-[#F0FDF4]/30 space-y-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-[#10B981]" />
+                <p className="text-[10px] font-black text-[#10B981] uppercase tracking-widest">Enkapsulasi (X.TCP.6)</p>
+              </div>
+              <p className="text-xs font-bold text-[#395886]/80 leading-relaxed italic bg-white/80 p-3.5 rounded-xl border border-[#10B981]/10">
+                "{module1Data?.bestArgument?.argument || 'Hasil belum tersedia'}"
+              </p>
+            </div>
+            <div className="p-5 rounded-2xl border-2 border-[#628ECB]/20 bg-[#EEF4FF]/30 space-y-3">
+              <div className="flex items-center gap-2">
+                <PlayCircle className="w-4 h-4 text-[#628ECB]" />
+                <p className="text-[10px] font-black text-[#628ECB] uppercase tracking-widest">Dekapsulasi (X.TCP.7)</p>
+              </div>
+              <p className="text-xs font-bold text-[#395886]/80 leading-relaxed italic bg-white/80 p-3.5 rounded-xl border border-[#628ECB]/10">
+                "{module2Data?.bestArgument?.argument || 'Hasil belum tersedia'}"
+              </p>
+            </div>
+          </div>
+
+          <button onClick={onNext} className="w-full py-5 rounded-2xl bg-[#395886] text-white font-black text-sm shadow-xl active:scale-95 transition-all hover:bg-[#2A4468] flex items-center justify-center gap-2 group">
+            Lanjut ke Kesimpulan Individu <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </button>
+        </div>
+      </ActivityCard>
+    </div>
+  );
 }
 
 // -- Main LearningCommunityStage ------------------------------------------------
 
-export function LearningCommunityStage({ lessonId, stageIndex, moduleId, groupName, onComplete, isCompleted }: LearningCommunityStageProps) {
-  const user = getCurrentUser();
+export function LearningCommunityStage({ 
+  lessonId, stageIndex, moduleId, groupName, onComplete, isCompleted,
+  layers5 = [], encapsulationCase, decapsulationCase
+}: LearningCommunityStageProps) {
   const tracker = useActivityTracker({
     lessonId,
     stageIndex,
     stageType: 'learning-community',
   });
-  const [subStage, setSubPhase] = useState<'init' | 'module1' | 'module2' | 'summary'>(isCompleted ? 'summary' : 'init');
+  
+  const [subStage, setSubPhase] = useState<'simulasi' | 'x_tcp_6' | 'x_tcp_7' | 'group_result' | 'individual_summary'>(isCompleted ? 'individual_summary' : 'simulasi');
+  const [understood, setUnderstood] = useState(false);
   const [module1Data, setModule1Data] = useState<any>(null);
   const [module2Data, setModule2Data] = useState<any>(null);
-  const [understood, setUnderstood] = useState(false);
+  const [members, setMembers] = useState<{ user_id: string; user_name: string }[]>([]);
 
   useEffect(() => {
-    const progressMap = { init: 10, module1: 35, module2: 65, summary: 90 } as const;
+    if (groupName) {
+      getGroupMembers(groupName).then(setMembers);
+    }
+  }, [groupName]);
+
+  useEffect(() => {
+    const progressMap = { simulasi: 10, x_tcp_6: 35, x_tcp_7: 65, group_result: 85, individual_summary: 95 } as const;
     void tracker.saveSnapshot(
-      {
-        subStage,
-        moduleId,
-        groupName,
-        understood,
-        module1Data,
-        module2Data,
-      },
+      { subStage, understood, module1Data, module2Data },
       { progressPercent: progressMap[subStage] },
     );
-  }, [groupName, module1Data, module2Data, moduleId, subStage, tracker, understood]);
-
-  // Lesson 1 Case Data
-  const encapStudy: CaseStudy = { id: 'cs1', title: 'Misi Pengiriman Pesan', description: 'Kamu sedang berada di PC A dan ingin mengirim pesan "Halo Dunia". Langkah manakah yang harus kamu ambil terlebih dahulu menurut aturan Enkapsulasi?', options: [{ id: 'o1', text: 'Menempelkan IP Address PC B', isCorrect: false }, { id: 'o2', text: 'Membungkus data dengan TCP Header', isCorrect: true }, { id: 'o3', text: 'Mengirimkan bit melalui kabel', isCorrect: false }], correctFeedback: 'TCP Header (Transport) adalah langkah pertama setelah data dibuat di Application.' };
-  const decapStudy: CaseStudy = { id: 'cs2', title: 'Misi Penerimaan Pesan', description: 'Data telah sampai di PC B. Sebagai protokol penerima, langkah manakah yang harus dilakukan paling akhir sebelum pesan dibaca?', options: [{ id: 'o1', text: 'Membuka bungkusan MAC Frame', isCorrect: false }, { id: 'o2', text: 'Memverifikasi IP Address', isCorrect: false }, { id: 'o3', text: 'Membuka tumpukan TCP Header', isCorrect: true }], correctFeedback: 'TCP Header adalah lapisan terakhir yang dibuka sebelum data kembali ke Application.' };
+  }, [subStage, understood, module1Data, module2Data, tracker]);
 
   if (!groupName) return (
-    <div className="max-w-4xl mx-auto p-12 text-center bg-white rounded-[2rem] border-2 border-dashed border-[#D5DEEF]">
-       <Users className="w-12 h-12 text-[#D5DEEF] mx-auto mb-4" />
-       <p className="text-sm font-bold text-[#395886]/40 italic">Silakan pilih kelompok terlebih dahulu di Dashboard untuk memulai aktivitas ini.</p>
+    <div className="w-full p-16 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-[#D5DEEF] shadow-inner">
+       <div className="h-16 w-16 mx-auto mb-6 text-[#D5DEEF]"><Users className="w-full h-full" /></div>
+       <h4 className="text-xl font-black text-[#395886] mb-2 uppercase tracking-tight">Kelompok Belum Terdeteksi</h4>
+       <p className="text-sm font-bold text-[#395886]/40 italic max-w-sm mx-auto leading-relaxed">
+         Pilih kelompokmu di <span className="text-[#628ECB] not-italic font-black">Dashboard</span> untuk memulai simulasi kolaborasi ini.
+       </p>
     </div>
   );
 
-  if (subStage === 'init') return (
-    <div className={`max-w-4xl mx-auto space-y-6 ${anim.fadeUp}`}>
-       <div className="bg-white rounded-[2rem] border-2 border-[#F59E0B]/20 p-10 shadow-sm text-center">
-          <div className="h-16 w-16 rounded-2xl bg-[#F59E0B]/10 flex items-center justify-center text-[#F59E0B] mx-auto mb-6"><PlayCircle className="w-8 h-8" /></div>
-          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#F59E0B]">Tahap Awal - Simulasi</p>
-          <h3 className="text-2xl font-black text-[#395886] mb-4">Mari Berkolaborasi!</h3>
-          <p className="text-sm font-medium text-[#395886]/60 leading-relaxed mb-8 max-w-md mx-auto">Dalam tahap ini, kamu akan bekerja sama dengan rekan kelompok <span className="text-[#F59E0B] font-black">{groupName}</span> untuk memecahkan studi kasus alur data.</p>
+  if (subStage === 'simulasi') return (
+    <div className={`w-full space-y-8 ${anim.fadeUp}`}>
+       <div className="bg-white rounded-[2rem] border-2 border-[#628ECB]/20 p-8 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-4 mb-8 text-left border-b border-[#D5DEEF]/60 pb-5">
+             <div className="h-12 w-12 rounded-xl bg-[#628ECB]/10 text-[#628ECB] flex items-center justify-center shadow-sm"><Monitor className="w-6 h-6" /></div>
+             <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#628ECB]">Tahap Simulasi</p>
+                <h2 className="text-lg font-black text-[#395886]">Visualisasi Interaktif Enkapsulasi & Dekapsulasi</h2>
+             </div>
+          </div>
           
-          <div className="bg-[#F8FAFD] p-6 rounded-2xl border-2 border-[#D5DEEF] mb-8 flex items-center gap-4 text-left">
-             <input type="checkbox" id="understand" checked={understood} onChange={e => setUnderstood(e.target.checked)} className="h-5 w-5 accent-[#10B981]" />
-             <label htmlFor="understand" className="text-xs font-bold text-[#395886] cursor-pointer">Saya telah memahami instruksi dan siap berdiskusi secara real-time dengan kelompok.</label>
+          <TcpIpInteractive />
+
+          <div className={`mt-10 p-6 rounded-2xl border-2 transition-all text-left flex items-start gap-4 ${understood ? 'border-[#10B981] bg-[#F0FDF4]/50' : 'border-[#D5DEEF] bg-[#F8FAFD]'}`}>
+             <button onClick={() => setUnderstood(!understood)} className={`mt-1 h-6 w-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${understood ? 'bg-[#10B981] border-[#10B981]' : 'bg-white border-[#D5DEEF]'}`}>
+                {understood && <CheckCircle className="w-4 h-4 text-white" />}
+             </button>
+             <label className="text-sm font-bold text-[#395886] leading-relaxed cursor-pointer select-none">
+                Saya sudah memahami proses Enkapsulasi & Dekapsulasi melalui simulasi di atas dan siap menganalisis skenario bersama kelompok <span className="text-[#628ECB] font-black">{groupName}</span>.
+             </label>
           </div>
 
-          <button onClick={() => { void tracker.trackEvent('learning_intro_confirmed', { groupName }, { progressPercent: 15 }); setSubPhase('module1'); }} disabled={!understood} className="w-full py-4 rounded-2xl bg-[#395886] text-white font-black text-sm shadow-xl disabled:bg-[#D5DEEF] active:scale-95 transition-all">Mulai Aktivitas X.TCP.6</button>
+          <button 
+            onClick={() => setSubPhase('x_tcp_6')} 
+            disabled={!understood} 
+            className={`w-full mt-8 py-5 rounded-2xl font-black text-sm shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3
+              ${understood ? 'bg-[#395886] text-white hover:bg-[#2A4468]' : 'bg-[#D5DEEF] text-[#395886]/40 cursor-not-allowed'}`}
+          >
+             Mulai Aktivitas Kelompok <ChevronRight className="w-5 h-5" />
+          </button>
        </div>
     </div>
   );
 
-  if (subStage === 'module1') return <ModuleFlow lessonId={lessonId} moduleId="X.TCP.6" groupName={groupName} title="Proses Enkapsulasi" concept="Enkapsulasi adalah proses pembungkusan data dengan informasi kontrol (header) dari lapisan atas ke bawah." layers={['Application Data', 'TCP Segment', 'IP Packet', 'MAC Frame']} study={encapStudy} isEncapsulation={true} onModuleDone={d => { setModule1Data(d); void tracker.trackEvent('learning_module_completed', { moduleId: 'X.TCP.6' }, { progressPercent: 50 }); setSubPhase('module2'); }} />;
-  if (subStage === 'module2') return <ModuleFlow lessonId={lessonId} moduleId="X.TCP.7" groupName={groupName} title="Proses Dekapsulasi" concept="Dekapsulasi adalah kebalikan dari enkapsulasi, di mana header dilepas satu per satu dari lapisan bawah ke atas." layers={['MAC Frame', 'IP Packet', 'TCP Segment', 'Application Data']} study={decapStudy} isEncapsulation={false} onModuleDone={d => { setModule2Data(d); void tracker.trackEvent('learning_module_completed', { moduleId: 'X.TCP.7' }, { progressPercent: 80 }); setSubPhase('summary'); }} />;
-  if (subStage === 'summary') return <OverallResult lessonId={lessonId} groupName={groupName} onComplete={essay => { const finalAnswer = { module1Data, module2Data, finalConclusion: essay }; void tracker.complete(finalAnswer, { subStage: 'summary', finalAnswer }); onComplete(finalAnswer); }} />;
+  if (subStage === 'x_tcp_6') return (
+    <ModuleFlow 
+      key="x_tcp_6"
+      lessonId={lessonId} 
+      moduleId={encapsulationCase?.id || 'X.TCP.6'} 
+      groupName={groupName} 
+      title={encapsulationCase?.title || 'Aktivitas Enkapsulasi'} 
+      concept={encapsulationCase?.concept || 'Enkapsulasi adalah proses pembungkusan data.'} 
+      layers={layers5} 
+      study={encapsulationCase!} 
+      isEncapsulation={true} 
+      onModuleDone={d => { setModule1Data(d); setSubPhase('x_tcp_7'); }} 
+    />
+  );
+
+  if (subStage === 'x_tcp_7') return (
+    <ModuleFlow 
+      key="x_tcp_7"
+      lessonId={lessonId} 
+      moduleId={decapsulationCase?.id || 'X.TCP.7'} 
+      groupName={groupName} 
+      title={decapsulationCase?.title || 'Aktivitas Dekapsulasi'} 
+      concept={decapsulationCase?.concept || 'Dekapsulasi adalah proses pembukaan data.'} 
+      layers={[...layers5].reverse()} 
+      study={decapsulationCase!} 
+      isEncapsulation={false} 
+      onModuleDone={d => { setModule2Data(d); setSubPhase('group_result'); }} 
+    />
+  );
+
+  if (subStage === 'group_result') return (
+    <OverallGroupResult 
+      module1Data={module1Data} 
+      module2Data={module2Data} 
+      groupName={groupName} 
+      onNext={() => setSubPhase('individual_summary')} 
+    />
+  );
+
+  if (subStage === 'individual_summary') return (
+    <div className={`space-y-8 ${anim.fadeUp} w-full`}>
+      <ActivityCard
+        icon={<Award className="w-5 h-5 text-[#10B981]" />}
+        label="Langkah Akhir"
+        title="Kesimpulan Individu"
+        headerBg="bg-[#10B981]/5"
+        headerBorder="border-[#10B981]/20"
+        iconBg="bg-[#10B981]/10"
+        labelCls="text-[#10B981]"
+      >
+        <div className="space-y-6">
+          <InstructionBox accent="text-[#10B981]">
+            Selesaikan tahap Learning Community dengan menuliskan pemahaman pribadimu berdasarkan hasil kolaborasi kelompok.
+          </InstructionBox>
+          
+          <EssayBox 
+            objectiveLabel={moduleId}
+            prompt="Berdasarkan hasil diskusi kelompokmu, simpulkan mengapa pemahaman alur enkapsulasi dan dekapsulasi sangat penting bagi seorang teknisi jaringan dalam melakukan troubleshooting?"
+            submitLabel="Selesaikan Seluruh Aktivitas"
+            onSubmit={essay => {
+              const finalAnswer = { module1Data, module2Data, finalConclusion: essay };
+              void tracker.complete(finalAnswer, { finalAnswer });
+              onComplete(finalAnswer);
+            }}
+            minChars={50}
+          />
+        </div>
+      </ActivityCard>
+    </div>
+  );
 
   return null;
 }

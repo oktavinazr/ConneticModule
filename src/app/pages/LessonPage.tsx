@@ -35,6 +35,7 @@ import { Logo } from '../components/layout/Logo';
 import { getStageDisplayTitle, lessons, stageLearningObjectivesByLesson } from '../data/lessons';
 import { getCurrentUser } from '../utils/auth';
 import { getCachedProgress, getLessonProgress, saveStageProgress } from '../utils/progress';
+import { getStudentGroup } from '../utils/groups';
 import { StageAnswerDetail } from '../components/admin/StageDetail';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -240,6 +241,7 @@ export function LessonPage() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
   const [user] = useState(() => getCurrentUser());
+  const [groupName, setGroupName] = useState<string | undefined>(user?.groupName);
   const lesson = lessonId ? lessons[lessonId] : null;
 
   const initialProgress = getCachedProgress(user?.id ?? '', lessonId ?? '');
@@ -274,6 +276,14 @@ export function LessonPage() {
       });
     }
   }, [lessonId, user]);
+
+  useEffect(() => {
+    if (user) {
+      getStudentGroup(user.id).then((g) => {
+        if (g) setGroupName(g);
+      });
+    }
+  }, [user]);
 
   const fullyCompleted =
     progress?.pretestCompleted &&
@@ -424,7 +434,7 @@ export function LessonPage() {
             layers5={currentStage.layers5}
             groupActivity={currentStage.groupActivity}
             moduleId={currentStage.moduleId || ''}
-            groupName={user?.groupName}
+            groupName={groupName}
           />
         );
       case 'modeling': {

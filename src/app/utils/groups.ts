@@ -88,6 +88,23 @@ export async function deleteAdminGroupName(groupName: string): Promise<void> {
   if (error) console.error('[deleteAdminGroupName]', error.message);
 }
 
+export async function getGroupMembers(groupName: string): Promise<{ user_id: string; user_name: string }[]> {
+  const { data, error } = await supabase
+    .from('student_groups')
+    .select('user_id, users(name)')
+    .eq('group_name', groupName);
+
+  if (error || !data) {
+    if (error) console.error('[getGroupMembers]', error.message);
+    return [];
+  }
+
+  return data.map((row: any) => ({
+    user_id: row.user_id,
+    user_name: row.users?.name || 'Siswa',
+  }));
+}
+
 export async function getGroupDiscussions(lessonId: string, moduleId: string, groupName: string): Promise<GroupDiscussion[]> {
   const { data, error } = await supabase
     .from('group_discussions')

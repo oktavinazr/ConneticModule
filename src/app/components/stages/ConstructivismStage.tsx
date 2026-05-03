@@ -48,48 +48,55 @@ function getYouTubeId(url: string) {
 // -- Essay Box -----------------------------------------------------------------
 
 function EssayBox({
-  prompt, objectiveLabel, submitLabel, onSubmit,
+  prompt, objectiveLabel, submitLabel, onSubmit, minWords = 15,
 }: {
-  prompt: string; objectiveLabel: string; submitLabel: string; onSubmit: (text: string) => void;
+  prompt: string; objectiveLabel: string; submitLabel: string; onSubmit: (text: string) => void; minWords?: number;
 }) {
   const [text, setText] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const MIN_CHARS = 30;
-  const ready = text.trim().length >= MIN_CHARS;
+  const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+  const ready = wordCount >= minWords;
 
   return (
-    <div className="mt-5 p-5 rounded-2xl bg-gradient-to-br from-[#628ECB]/8 to-[#395886]/5 border-2 border-[#628ECB]/30">
-      <div className="flex items-center gap-2 mb-1">
-        <PenLine className="w-4 h-4 text-[#628ECB] shrink-0" />
-        <p className="text-[10px] font-black uppercase tracking-widest text-[#628ECB]">Esai Mandiri - {objectiveLabel}</p>
+    <div className="mt-5 p-6 rounded-[2rem] bg-gradient-to-br from-[#628ECB]/5 to-[#395886]/5 border-2 border-[#628ECB]/20 shadow-inner">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="p-2 rounded-xl bg-[#628ECB]/10 text-[#628ECB]">
+          <PenLine className="w-4 h-4" />
+        </div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-[#628ECB]/60">Refleksi Mandiri — {objectiveLabel}</p>
       </div>
-      <p className="text-sm font-semibold text-[#395886] leading-relaxed mb-3 mt-1">{prompt}</p>
+      <p className="text-sm font-bold text-[#395886] leading-relaxed mb-4">{prompt}</p>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         disabled={submitted}
         rows={4}
-        className="w-full px-4 py-3 border-2 border-[#D5DEEF] rounded-xl text-sm text-[#395886] focus:outline-none focus:ring-2 focus:ring-[#628ECB]/30 focus:border-[#628ECB] transition resize-none disabled:bg-[#F0F3FA]"
-        placeholder="Tuliskan jawabanmu di sini..."
+        className="w-full px-5 py-4 border-2 border-[#D5DEEF] rounded-2xl text-sm text-[#395886] focus:outline-none focus:ring-4 focus:ring-[#628ECB]/10 focus:border-[#628ECB] transition-all bg-white/80 backdrop-blur-sm resize-none disabled:bg-[#F0F3FA]/50"
+        placeholder="Tuliskan pemikiran logismu di sini..."
       />
-      <div className="flex items-center justify-between mt-1.5 mb-4">
-        <p className={`text-[11px] ${ready ? 'text-[#10B981]' : 'text-[#395886]/50'}`}>
-          {text.trim().length} karakter (minimal {MIN_CHARS})
-        </p>
+      <div className="flex items-center justify-between mt-3 mb-4 px-1">
+        <div className="flex items-center gap-2">
+          <div className={`h-1.5 w-24 rounded-full bg-[#D5DEEF] overflow-hidden`}>
+             <div className={`h-full transition-all duration-500 ${ready ? 'bg-[#10B981]' : 'bg-[#628ECB]'}`} style={{ width: `${Math.min(100, (wordCount / minWords) * 100)}%` }} />
+          </div>
+          <p className={`text-[11px] font-black uppercase tracking-tighter ${ready ? 'text-[#10B981]' : 'text-[#395886]/40'}`}>
+            {wordCount} / {minWords} Kata
+          </p>
+        </div>
         {submitted && (
-          <span className="flex items-center gap-1 text-[11px] font-bold text-[#10B981]">
-            <CheckCircle className="w-3.5 h-3.5" /> Tersimpan
+          <span className="flex items-center gap-1.5 text-xs font-black text-[#10B981] uppercase tracking-widest">
+            <CheckCircle className="w-4 h-4" /> Tersimpan
           </span>
         )}
       </div>
       {!submitted && (
         <button
-          onClick={() => { if (!ready) return; setSubmitted(true); onSubmit(text.trim()); }}
+          onClick={() => { if (ready) { setSubmitted(true); onSubmit(text.trim()); } }}
           disabled={!ready}
-          className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm ${ready ? 'bg-[#628ECB] text-white hover:bg-[#395886]' : 'bg-[#D5DEEF] text-[#395886]/40 cursor-not-allowed'}`}
+          className={`w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-sm transition-all shadow-xl active:scale-95 ${ready ? 'bg-[#10B981] text-white hover:bg-[#059669] shadow-green-200' : 'bg-[#D5DEEF] text-[#395886]/40 cursor-not-allowed'}`}
         >
           {submitLabel}
-          <ChevronRight className="w-4 h-4" />
+          <ArrowRight className="w-5 h-5" />
         </button>
       )}
     </div>
@@ -258,16 +265,20 @@ function StoryScramblePhase({
   };
 
   const handleRetry = () => {
-    const wrongSlots = Object.entries(slots).filter(([k, v]) => {
-      const f = fragmentById(v);
-      return f?.order !== Number(k);
+    const nextSlots = { ...slots };
+    let hasChanges = false;
+    Object.keys(nextSlots).forEach(key => {
+      const slotNum = Number(key);
+      const f = fragmentById(nextSlots[slotNum]);
+      if (f?.order !== slotNum) {
+        delete nextSlots[slotNum];
+        hasChanges = true;
+      }
     });
-    setSlots(prev => {
-      const next = { ...prev };
-      wrongSlots.forEach(([k]) => delete next[Number(k)]);
-      onComplete(undefined, next);
-      return next;
-    });
+    if (hasChanges) {
+      setSlots(nextSlots);
+      onComplete(undefined, nextSlots);
+    }
     setValidated(false);
   };
 
@@ -609,7 +620,23 @@ function OrderedProcessChain({ items, essayPrompt, lessonId, stageIndex, onCompl
     if (isCorrectOrder || newA >= 3) setShowEssay(true);
   };
 
-  const handleRetry = () => setValidated(false);
+  const handleRetry = () => {
+    const nextSlots = { ...slots };
+    let hasChanges = false;
+    Object.keys(nextSlots).forEach(key => {
+      const item = getItemById(nextSlots[key]);
+      const [type, order] = key.split('-');
+      if (item?.type !== type || item?.correctOrder !== Number(order)) {
+        delete nextSlots[key];
+        hasChanges = true;
+      }
+    });
+    if (hasChanges) {
+      setSlots(nextSlots);
+      onComplete(undefined, nextSlots);
+    }
+    setValidated(false);
+  };
   const isTerminal = validated && (isCorrectOrder || attempts >= 3);
 
   return (
@@ -1252,7 +1279,7 @@ export function ConstructivismStage(props: ConstructivismStageProps) {
                 void tracker.trackEvent('constructivism_scramble_completed', { hasEssay: !!essayText }, { progressPercent: 45 });
                 setPhase('analogy');
               } else if (hasEssayFlow || !props.options?.length) {
-                const finalAnswer = { essay1: essayText };
+                const finalAnswer = { essay1: essayText, summary: essayText };
                 void tracker.complete(finalAnswer, { phase: 'scramble', finalAnswer });
                 onComplete(finalAnswer);
               } else {
@@ -1287,7 +1314,7 @@ export function ConstructivismStage(props: ConstructivismStageProps) {
 
             if (essayText !== undefined) {
               if (hasEssayFlow || !props.options?.length || !!storyScramble) {
-                const finalAnswer = { essay1: essay1Text, essay2: essayText };
+                const finalAnswer = { essay1: essay1Text, essay2: essayText, summary: essayText };
                 void tracker.complete(finalAnswer, { phase: 'analogy', finalAnswer });
                 onComplete(finalAnswer);
               } else {
@@ -1314,8 +1341,9 @@ export function ConstructivismStage(props: ConstructivismStageProps) {
         initialData={mcqData}
         onComplete={(answer) => {
           setMcqData({ ...answer, submitted: true });
-          void tracker.complete(answer, { phase: 'mcq', finalAnswer: answer });
-          onComplete(answer);
+          const finalAnswer = { ...answer, summary: answer.reason };
+          void tracker.complete(finalAnswer, { phase: 'mcq', finalAnswer });
+          onComplete(finalAnswer);
         }}
       />
       <SkipButton targetPhase="complete" nextLabel="Selesaikan Tahap Ini" />

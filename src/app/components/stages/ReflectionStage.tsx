@@ -11,12 +11,9 @@ import {
   Users,
   Brain,
   MessageSquare,
-  ShieldCheck,
-  Zap,
-  Info,
-  Layers,
-  Search,
-  Layout
+  AlertCircle,
+  XCircle,
+  GripVertical
 } from 'lucide-react';
 import { getCurrentUser } from '../../utils/auth';
 import { getLessonProgress, saveStageAttempt } from '../../utils/progress';
@@ -24,40 +21,84 @@ import { useActivityTracker } from '../../hooks/useActivityTracker';
 
 // -- Types ----------------------------------------------------------------------
 
-interface ConceptNode {
-  id: string;
-  label: string;
-  x: number;
-  y: number;
-  color: string;
-}
-
-interface Connection {
-  from: string;
-  to: string;
-  label: string;
-}
+interface ConceptNode { id: string; text: string; x: number; y: number }
+interface Connection { from: string; to: string; label: string }
 
 interface ReflectionStageProps {
   lessonId: string;
   stageIndex: number;
-  moduleId: string; // e.g., 'X.TCP.9'
+  moduleId: string; // e.g., 'X.TCP.8'
   onComplete: (answer: any) => void;
   isCompleted?: boolean;
+  essayReflection?: {
+    materialSummaryPrompt: string;
+    easyPartPrompt: string;
+    hardPartPrompt: string;
+  };
+  selfEvaluationCriteria?: Array<{ id: string; text: string }>;
+}
+
+const CONNECTION_LABELS = ['Berhubungan dengan', 'Menghasilkan', 'Membutuhkan', 'Bagian dari', 'Mengontrol'];
+
+// -- Shared UI Components (Constructivism Theme) -------------------------------
+
+function R_EssayBox({
+  prompt, objectiveLabel, submitLabel, onSubmit, minWords = 15,
+}: {
+  prompt: string; objectiveLabel: string; submitLabel: string; onSubmit: (text: string) => void; minWords?: number;
+}) {
+  const [text, setText] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+  const ready = wordCount >= minWords;
+
+  return (
+    <div className="mt-5 p-6 rounded-[2rem] bg-gradient-to-br from-[#628ECB]/5 to-[#395886]/5 border-2 border-[#628ECB]/20 shadow-inner text-left">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="p-2 rounded-xl bg-[#628ECB]/10 text-[#628ECB]">
+          <PenLine className="w-4 h-4" />
+        </div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-[#628ECB]/60">Refleksi Mandiri — {objectiveLabel}</p>
+      </div>
+      <p className="text-sm font-bold text-[#395886] leading-relaxed mb-4">{prompt}</p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        disabled={submitted}
+        rows={4}
+        className="w-full px-5 py-4 border-2 border-[#D5DEEF] rounded-2xl text-sm text-[#395886] focus:outline-none focus:ring-4 focus:ring-[#628ECB]/10 focus:border-[#628ECB] transition-all bg-white/80 backdrop-blur-sm resize-none disabled:bg-[#F0F3FA]/50"
+        placeholder="Tuliskan refleksimu di sini..."
+      />
+      <div className="flex items-center justify-between mt-3 mb-4 px-1">
+        <div className="flex items-center gap-2">
+          <div className={`h-1.5 w-24 rounded-full bg-[#D5DEEF] overflow-hidden`}>
+             <div className={`h-full transition-all duration-500 ${ready ? 'bg-[#10B981]' : 'bg-[#628ECB]'}`} style={{ width: `${Math.min(100, (wordCount / minWords) * 100)}%` }} />
+          </div>
+          <p className={`text-[11px] font-black uppercase tracking-tighter ${ready ? 'text-[#10B981]' : 'text-[#395886]/40'}`}>
+            {wordCount} / {minWords} Kata
+          </p>
+        </div>
+        {submitted && (
+          <span className="flex items-center gap-1.5 text-xs font-black text-[#10B981] uppercase tracking-widest">
+            <CheckCircle className="w-4 h-4" /> Tersimpan
+          </span>
+        )}
+      </div>
+      {!submitted && (
+        <button
+          onClick={() => { if (ready) { setSubmitted(true); onSubmit(text.trim()); } }}
+          disabled={!ready}
+          className={`w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-sm transition-all shadow-xl active:scale-95 ${ready ? 'bg-[#10B981] text-white hover:bg-[#059669] shadow-green-200' : 'bg-[#D5DEEF] text-[#395886]/40 cursor-not-allowed'}`}
+        >
+          {submitLabel}
+          <ArrowRight className="w-5 h-5" />
+        </button>
+      )}
+    </div>
+  );
 }
 
 // -- Concept Map Builder --------------------------------------------------------
-
-const CONCEPT_POOL = [
-  { id: 'tcp', label: 'TCP', color: '#628ECB' },
-  { id: 'ip', label: 'IP Address', color: '#10B981' },
-  { id: 'encap', label: 'Enkapsulasi', color: '#8B5CF6' },
-  { id: 'decap', label: 'Dekapsulasi', color: '#EC4899' },
-  { id: 'segment', label: 'Segmentasi', color: '#395886' },
-  { id: 'pdu', label: 'PDU', color: '#F59E0B' },
-];
-
-const CONNECTION_LABELS = ['Berhubungan dengan', 'Bagian dari', 'Mengakibatkan', 'Membutuhkan', 'Mengamankan'];
 
 function ConceptMapBuilder({ lessonId, stageIndex, onNext, initialData }: { lessonId: string; stageIndex: number; onNext: (data: any) => void; initialData?: any }) {
   const tracker = useActivityTracker({
@@ -77,37 +118,22 @@ function ConceptMapBuilder({ lessonId, stageIndex, onNext, initialData }: { less
 
   useEffect(() => {
     void tracker.saveSnapshot(
-      {
-        phase: 'map',
-        nodes,
-        connections,
-        selectedFrom,
-      },
-      {
-        progressPercent: nodes.length === 0 ? 5 : Math.min(60, 10 + nodes.length * 10 + connections.length * 8),
-      },
+      { phase: 'map', nodes, connections, selectedFrom },
+      { progressPercent: nodes.length === 0 ? 5 : Math.min(60, 10 + nodes.length * 10 + connections.length * 8) },
     );
   }, [connections, nodes, selectedFrom, tracker]);
 
-  const addNode = (concept: typeof CONCEPT_POOL[0]) => {
-    if (nodes.find(n => n.id === concept.id)) return;
-    const newNode: ConceptNode = {
-      ...concept,
-      x: 50 + Math.random() * 200,
-      y: 50 + Math.random() * 150
-    };
+  const addNode = (text: string) => {
+    const newNode: ConceptNode = { id: Math.random().toString(36).substr(2, 9), text, x: 50 + Math.random() * 200, y: 50 + Math.random() * 200 };
     setNodes([...nodes, newNode]);
-    void tracker.trackEvent('concept_node_added', { conceptId: concept.id, label: concept.label });
+    void tracker.trackEvent('concept_node_added', { text });
   };
 
-  const handleNodeClick = (id: string) => {
+  const onNodeClick = (id: string) => {
     if (!selectedFrom) {
       setSelectedFrom(id);
-    } else if (selectedFrom === id) {
-      setSelectedFrom(null);
     } else {
-      // Create connection
-      if (!connections.find(c => (c.from === selectedFrom && c.to === id) || (c.from === id && c.to === selectedFrom))) {
+      if (selectedFrom !== id) {
         setConnections([...connections, { from: selectedFrom, to: id, label: CONNECTION_LABELS[0] }]);
         void tracker.trackEvent('concept_connection_added', { from: selectedFrom, to: id });
       }
@@ -116,116 +142,75 @@ function ConceptMapBuilder({ lessonId, stageIndex, onNext, initialData }: { less
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-[2rem] border-2 border-[#F59E0B]/20 p-8 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-10 w-10 rounded-xl bg-[#F59E0B]/10 flex items-center justify-center text-[#F59E0B]"><Brain className="w-6 h-6" /></div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#F59E0B] mb-1">X.TCP.9 - Concept Map Builder</p>
-            <h3 className="text-base font-bold text-[#395886]">Visualisasikan Hubungan Antar Konsep</h3>
+    <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-700">
+      <div className="bg-white rounded-[2rem] border-2 border-[#D5DEEF] p-8 shadow-sm text-center">
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <div className="h-12 w-12 rounded-2xl bg-[#628ECB]/10 flex items-center justify-center text-[#628ECB] shadow-inner"><Brain className="w-7 h-7" /></div>
+          <div className="text-left">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#628ECB]">Aktivitas X.TCP.8</p>
+            <h3 className="text-2xl font-black text-[#395886] tracking-tight">Peta Konsep Akhir</h3>
           </div>
         </div>
-
-        <div className="grid lg:grid-cols-[250px_1fr] gap-8">
-           <div className="space-y-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#395886]/40 px-2">Pilih Konsep</p>
-              <div className="grid gap-2">
-                 {CONCEPT_POOL.map(c => (
-                   <button key={c.id} onClick={() => addNode(c)} disabled={nodes.some(n => n.id === c.id)} className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${nodes.some(n => n.id === c.id) ? 'opacity-30 cursor-not-allowed' : 'bg-white border-[#D5DEEF] hover:border-[#628ECB]'}`}>
-                      <Plus className="w-3.5 h-3.5 text-[#628ECB]" />
-                      <span className="text-xs font-bold text-[#395886]">{c.label}</span>
-                   </button>
-                 ))}
-              </div>
-           </div>
-
-           <div className="relative bg-[#F8FAFD] rounded-3xl border-2 border-[#D5DEEF] min-h-[400px] overflow-hidden shadow-inner p-8">
-              {nodes.length === 0 && <div className="absolute inset-0 flex items-center justify-center text-[#395886]/20 font-black uppercase text-xs tracking-widest">Kanvas Masih Kosong</div>}
-              
-              <div className="flex flex-wrap gap-4 relative z-10">
-                 {nodes.map(node => (
-                   <button key={node.id} onClick={() => handleNodeClick(node.id)} className={`px-5 py-3 rounded-2xl border-b-4 font-black text-xs transition-all shadow-md ${selectedFrom === node.id ? 'ring-4 ring-[#F59E0B]/30 scale-110' : 'hover:scale-105'}`} style={{ backgroundColor: node.color, color: 'white', borderColor: 'rgba(0,0,0,0.1)' }}>
-                      {node.label}
-                   </button>
-                 ))}
-              </div>
-
-              <div className="mt-12 space-y-3 relative z-10">
-                 <p className="text-[10px] font-black uppercase tracking-widest text-[#395886]/30">Hubungan Terpetakan ({connections.length})</p>
-                 {connections.map((c, i) => {
-                   const fromNode = nodes.find(n => n.id === c.from);
-                   const toNode = nodes.find(n => n.id === c.to);
-                   return (
-                     <div key={i} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-[#D5DEEF] shadow-sm text-[11px] font-bold text-[#395886] mr-2">
-                        {fromNode?.label} <ArrowRight className="w-3 h-3 text-[#628ECB]" /> {toNode?.label}
-                     </div>
-                   );
-                 })}
-              </div>
-           </div>
+        <p className="text-sm font-bold text-[#395886]/50 mb-8 max-w-md mx-auto italic">"Hubungkan konsep-konsep kunci yang telah kamu pelajari hari ini (TCP, IP, Layer, Enkapsulasi, dll) untuk menunjukkan pemahamanmu."</p>
+        
+        <div className="bg-[#F8FAFD] rounded-[2rem] border-2 border-dashed border-[#D5DEEF] p-8 min-h-[400px] relative overflow-hidden shadow-inner mb-8">
+           {nodes.map(n => (
+             <div key={n.id} onClick={() => onNodeClick(n.id)} className={`absolute px-5 py-3 rounded-2xl border-2 font-black text-xs cursor-pointer transition-all ${selectedFrom === n.id ? 'bg-[#10B981] border-[#10B981] text-white shadow-lg scale-110' : 'bg-white border-[#628ECB] text-[#395886] hover:shadow-md'}`} style={{ left: n.x, top: n.y }}>{n.text}</div>
+           ))}
+           {connections.map((c, i) => {
+              const f = nodes.find(n => n.id === c.from), t = nodes.find(n => n.id === c.to);
+              if (!f || !t) return null;
+              return <svg key={i} className="absolute inset-0 w-full h-full pointer-events-none"><line x1={f.x + 40} y1={f.y + 20} x2={t.x + 40} y2={t.y + 20} stroke="#628ECB" strokeWidth="2" strokeDasharray="4" /></svg>
+           })}
+           {nodes.length === 0 && <div className="absolute inset-0 flex items-center justify-center text-[#395886]/20 font-black uppercase tracking-widest">Klik tombol di bawah untuk menambah konsep</div>}
         </div>
-      </div>
 
-      <button onClick={() => onNext({ nodes, connections })} disabled={nodes.length < 3 || connections.length < 2} className="w-full py-4 rounded-2xl bg-[#395886] text-white font-black text-sm shadow-xl disabled:bg-[#D5DEEF] transition-all">Lanjut ke Refleksi Esai</button>
+        <div className="flex gap-2 justify-center mb-8">
+           <button onClick={() => addNode(prompt('Masukkan Konsep:') || '')} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#628ECB] text-white font-black text-sm shadow-lg active:scale-95 transition-all"><Plus className="w-5 h-5" /> Tambah Konsep</button>
+        </div>
+
+        <button onClick={() => onNext({ nodes, connections })} disabled={nodes.length < 3} className="w-full py-4 rounded-[1.5rem] bg-[#395886] text-white font-black text-sm shadow-xl active:scale-95 transition-all disabled:bg-[#D5DEEF]">Selesaikan Peta & Lanjut <ChevronRight className="w-4 h-4 inline ml-1" /></button>
+      </div>
     </div>
   );
 }
 
-// -- Essay + Self-Eval ---------------------------------------------------------
+// -- Essay Phase ---------------------------------------------------------------
 
 function EssayPhase({ lessonId, stageIndex, mapData, onDone, initialData }: { lessonId: string; stageIndex: number; mapData: any; onDone: (data: any) => void; initialData?: any }) {
-  const tracker = useActivityTracker({
-    lessonId,
-    stageIndex,
-    stageType: 'reflection',
-  });
-  const [essay, setEssay] = useState(initialData?.essay || '');
   const [confidence, setConfidence] = useState(initialData?.confidence || 3);
 
-  useEffect(() => {
-    if (initialData?.essay) setEssay(initialData.essay);
-    if (initialData?.confidence) setConfidence(initialData.confidence);
-  }, [initialData]);
-
-  useEffect(() => {
-    void tracker.saveSnapshot(
-      {
-        phase: 'essay',
-        mapData,
-        essay,
-        confidence,
-      },
-      {
-        progressPercent: essay.length < 10 ? 70 : Math.min(95, 70 + Math.round(Math.min(25, essay.length / 6))),
-      },
-    );
-  }, [confidence, essay, mapData, tracker]);
-
   return (
-    <div className="max-w-3xl mx-auto space-y-6 animate-in zoom-in-95 duration-500">
-      <div className="bg-white rounded-[2rem] border-2 border-[#D5DEEF] p-8 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-10 w-10 rounded-xl bg-[#628ECB]/10 flex items-center justify-center text-[#628ECB]"><PenLine className="w-6 h-6" /></div>
-          <h3 className="text-xl font-black text-[#395886]">Refleksi Akhir Pertemuan</h3>
+    <div className="max-w-4xl mx-auto space-y-6 animate-in zoom-in-95 duration-500 text-center">
+      <div className="bg-white rounded-[2.5rem] border-2 border-[#D5DEEF] p-8 md:p-10 shadow-sm">
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <div className="h-12 w-12 rounded-2xl bg-[#628ECB]/10 flex items-center justify-center text-[#628ECB] shadow-inner"><PenLine className="w-7 h-7" /></div>
+          <div className="text-left">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#628ECB]">Refleksi Akhir</p>
+            <h3 className="text-2xl font-black text-[#395886] tracking-tight">Kesimpulan Belajar Hari Ini</h3>
+          </div>
         </div>
         
-        <p className="text-sm font-bold text-[#395886]/60 mb-6 leading-relaxed">Setelah melewati seluruh tahapan belajar hari ini, bagaimana kamu menyimpulkan peran protokol TCP/IP dalam menjaga keutuhan data di internet?</p>
-        <textarea value={essay} onChange={e => setEssay(e.target.value)} rows={5} className="w-full p-5 rounded-[1.5rem] border-2 border-[#D5DEEF] text-sm focus:border-[#628ECB] outline-none bg-[#F8FAFD] mb-8" placeholder="Tuliskan refleksimu di sini..." />
-        
-        <div className="space-y-4">
-           <p className="text-xs font-black uppercase tracking-widest text-[#395886]/40">Tingkat Keyakinan Pemahaman</p>
+        <div className="space-y-6 mb-10 text-left">
+           <p className="text-xs font-black uppercase tracking-widest text-[#395886]/40 ml-1">Tingkat Keyakinan Pemahaman</p>
            <div className="flex items-center justify-between gap-2">
               {[1,2,3,4,5].map(v => (
-                <button key={v} onClick={() => setConfidence(v)} className={`flex-1 py-3 rounded-xl border-2 font-black text-sm transition-all ${confidence === v ? 'bg-[#10B981] border-[#10B981] text-white shadow-md' : 'bg-white border-[#D5DEEF] text-[#395886]/30'}`}>{v}</button>
+                <button key={v} onClick={() => setConfidence(v)} className={`flex-1 py-4 rounded-2xl border-2 font-black text-sm transition-all ${confidence === v ? 'bg-[#10B981] border-[#10B981] text-white shadow-lg shadow-[#10B981]/20' : 'bg-white border-[#D5DEEF] text-[#395886]/30 hover:border-[#628ECB]/30'}`}>{v}</button>
               ))}
            </div>
-           <div className="flex justify-between px-1 text-[9px] font-black text-[#395886]/30 uppercase tracking-tighter">
+           <div className="flex justify-between px-1 text-[10px] font-black text-[#395886]/30 uppercase tracking-tighter">
               <span>Kurang Yakin</span>
               <span>Sangat Yakin</span>
            </div>
         </div>
 
-        <button onClick={() => onDone({ essay, confidence })} disabled={essay.length < 50} className="w-full mt-10 py-4 rounded-2xl bg-[#10B981] text-white font-black text-sm shadow-xl disabled:bg-[#D5DEEF]">Selesaikan Seluruh Pertemuan</button>
+        <R_EssayBox 
+           objectiveLabel="Kesimpulan Unit"
+           prompt="Setelah melewati seluruh tahapan belajar hari ini, bagaimana kamu menyimpulkan peran protokol TCP/IP dalam menjaga keutuhan data di internet?"
+           submitLabel="Selesaikan Seluruh Pertemuan"
+           minWords={40}
+           onSubmit={(essay) => onDone({ essay, confidence })}
+        />
       </div>
     </div>
   );
@@ -233,7 +218,7 @@ function EssayPhase({ lessonId, stageIndex, mapData, onDone, initialData }: { le
 
 // -- Root component ------------------------------------------------------------
 
-export function ReflectionStage({ lessonId, stageIndex, moduleId, onComplete, isCompleted }: ReflectionStageProps) {
+export function ReflectionStage({ lessonId, stageIndex, onComplete, isCompleted }: ReflectionStageProps) {
   const tracker = useActivityTracker({
     lessonId,
     stageIndex,
@@ -265,6 +250,6 @@ export function ReflectionStage({ lessonId, stageIndex, moduleId, onComplete, is
   );
 
   if (phase === 'map') return <ConceptMapBuilder lessonId={lessonId} stageIndex={stageIndex} initialData={mapData} onNext={(data) => { setMapData(data); void tracker.trackEvent('reflection_map_completed', { nodeCount: data?.nodes?.length ?? 0, connectionCount: data?.connections?.length ?? 0 }, { progressPercent: 70 }); setPhase('essay'); }} />;
-  if (phase === 'essay') return <EssayPhase lessonId={lessonId} stageIndex={stageIndex} mapData={mapData} initialData={essayData} onDone={(data) => { const finalAnswer = { ...data, mapData }; void tracker.complete(finalAnswer, { phase: 'completed', finalAnswer }); onComplete(finalAnswer); }} />;
+  if (phase === 'essay') return <EssayPhase lessonId={lessonId} stageIndex={stageIndex} mapData={mapData} initialData={essayData} onDone={(data) => { const finalAnswer = { ...data, mapData, summary: data.essay }; void tracker.complete(finalAnswer, { phase: 'completed', finalAnswer }); onComplete(finalAnswer); }} />;
   return null;
 }

@@ -16,8 +16,6 @@ interface ExplorationSection { id: string; title: string; content: string; examp
 interface Group { id: string; label: string; colorClass: 'blue' | 'green' | 'purple' | 'amber' | 'pink' | 'indigo' }
 interface GroupItem { id: string; text: string; correctGroup: string }
 interface FlowItem { id: string; text: string; correctOrder: number; description?: string; colorClass?: string }
-interface LabelingSlot { id: string; label: string; description: string }
-interface LabelingLabel { id: string; text: string; correctSlot: string }
 interface MatchingPair { left: string; right: string }
 
 interface InquiryStageProps {
@@ -29,11 +27,8 @@ interface InquiryStageProps {
   explorationSections?: ExplorationSection[];
   groups?: Group[];
   groupItems?: GroupItem[];
-  question?: string;
   flowItems?: FlowItem[];
   flowInstruction?: string;
-  labelingSlots?: LabelingSlot[];
-  labelingLabels?: LabelingLabel[];
   matchingPairs?: MatchingPair[];
   inquiryReflection1?: string;
   inquiryReflection2?: string;
@@ -53,7 +48,6 @@ const colorMap = {
   pink:   { border: 'border-[#EC4899]', bg: 'bg-[#EC4899]/8', badge: 'bg-[#EC4899] text-white', light: 'bg-[#EC4899]/15 text-[#831843]' },
   indigo: { border: 'border-[#6366F1]', bg: 'bg-[#6366F1]/8', badge: 'bg-[#6366F1] text-white', light: 'bg-[#6366F1]/15 text-[#312E81]' },
 };
-type ColorKey = keyof typeof colorMap;
 
 const flowLayerColors: Record<string, { gradient: string; borderB: string }> = {
   purple: { gradient: 'bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED]', borderB: 'border-b-[#6D28D9]' },
@@ -63,47 +57,65 @@ const flowLayerColors: Record<string, { gradient: string; borderB: string }> = {
   pink:   { gradient: 'bg-gradient-to-r from-[#EC4899] to-[#DB2777]', borderB: 'border-b-[#9D174D]' },
 };
 
+// -- Standardized Essay Box (Matching Constructivism) --------------------------
+
+function InquiryEssayBox({
+  prompt, objectiveLabel, submitLabel, onSubmit, minWords = 15,
+}: {
+  prompt: string; objectiveLabel: string; submitLabel: string; onSubmit: (text: string) => void; minWords?: number;
+}) {
+  const [text, setText] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+  const ready = wordCount >= minWords;
+
+  return (
+    <div className="mt-5 p-6 rounded-[2rem] bg-gradient-to-br from-[#628ECB]/5 to-[#395886]/5 border-2 border-[#628ECB]/20 shadow-inner text-left">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="p-2 rounded-xl bg-[#628ECB]/10 text-[#628ECB]">
+          <PenLine className="w-4 h-4" />
+        </div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-[#628ECB]/60">Refleksi Mandiri — {objectiveLabel}</p>
+      </div>
+      <p className="text-sm font-bold text-[#395886] leading-relaxed mb-4">{prompt}</p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        disabled={submitted}
+        rows={4}
+        className="w-full px-5 py-4 border-2 border-[#D5DEEF] rounded-2xl text-sm text-[#395886] focus:outline-none focus:ring-4 focus:ring-[#628ECB]/10 focus:border-[#628ECB] transition-all bg-white/80 backdrop-blur-sm resize-none disabled:bg-[#F0F3FA]/50"
+        placeholder="Tuliskan pemikiran logismu di sini..."
+      />
+      <div className="flex items-center justify-between mt-3 mb-4 px-1">
+        <div className="flex items-center gap-2">
+          <div className={`h-1.5 w-24 rounded-full bg-[#D5DEEF] overflow-hidden`}>
+             <div className={`h-full transition-all duration-500 ${ready ? 'bg-[#10B981]' : 'bg-[#628ECB]'}`} style={{ width: `${Math.min(100, (wordCount / minWords) * 100)}%` }} />
+          </div>
+          <p className={`text-[11px] font-black uppercase tracking-tighter ${ready ? 'text-[#10B981]' : 'text-[#395886]/40'}`}>
+            {wordCount} / {minWords} Kata
+          </p>
+        </div>
+        {submitted && (
+          <span className="flex items-center gap-1.5 text-xs font-black text-[#10B981] uppercase tracking-widest">
+            <CheckCircle className="w-4 h-4" /> Tersimpan
+          </span>
+        )}
+      </div>
+      {!submitted && (
+        <button
+          onClick={() => { if (ready) { setSubmitted(true); onSubmit(text.trim()); } }}
+          disabled={!ready}
+          className={`w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-sm transition-all shadow-xl active:scale-95 ${ready ? 'bg-[#10B981] text-white hover:bg-[#059669] shadow-green-200' : 'bg-[#D5DEEF] text-[#395886]/40 cursor-not-allowed'}`}
+        >
+          {submitLabel}
+          <ArrowRight className="w-5 h-5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 // -- DnD Components ------------------------------------------------------------
-
-const DRAG_GROUP = 'GROUP_ITEM';
-function DraggableChip({ item, placed, validated, isCorrect }: { item: GroupItem; placed: boolean; validated: boolean; isCorrect?: boolean }) {
-  const [{ isDragging }, drag] = useDrag({
-    type: DRAG_GROUP,
-    item: { id: item.id },
-    canDrag: !validated,
-    collect: (m) => ({ isDragging: m.isDragging() }),
-  });
-  let cls = 'bg-white border-[#D5DEEF] cursor-move hover:border-[#628ECB]/60 hover:shadow-sm';
-  if (placed && validated) cls = isCorrect ? 'bg-[#10B981]/10 border-[#10B981] cursor-default' : 'bg-red-50 border-red-400 cursor-move';
-  else if (placed) cls = 'bg-[#628ECB]/8 border-[#628ECB]/40 cursor-move';
-  return (
-    <div ref={drag as unknown as React.Ref<HTMLDivElement>} className={`flex items-center gap-2 px-3 py-2 border-2 rounded-xl text-xs font-bold text-[#395886] select-none transition-all ${cls} ${isDragging ? 'opacity-50' : ''}`}>
-      {!validated && <GripVertical className="w-3.5 h-3.5 text-[#395886]/30 shrink-0" />}
-      {placed && validated && (isCorrect ? <CheckCircle className="w-3.5 h-3.5 text-[#10B981] shrink-0" /> : <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />)}
-      <span className="leading-snug">{item.text}</span>
-    </div>
-  );
-}
-
-function GroupBucket({ group, items, allItems, validated, onDrop }: { group: Group; items: string[]; allItems: GroupItem[]; validated: boolean; onDrop: (groupId: string, itemId: string) => void }) {
-  const colors = colorMap[group.colorClass as ColorKey] || colorMap.blue;
-  const [{ isOver }, drop] = useDrop({
-    accept: DRAG_GROUP,
-    drop: (dragged: { id: string }) => onDrop(group.id, dragged.id),
-    collect: (m) => ({ isOver: m.isOver() }),
-  });
-  return (
-    <div ref={drop as unknown as React.Ref<HTMLDivElement>} className={`rounded-2xl border-2 p-4 min-h-[140px] transition-all ${isOver ? `${colors.border} ${colors.bg} shadow-md` : 'border-[#D5DEEF] bg-[#F8FAFF]'}`}>
-      <div className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase mb-3 ${colors.badge}`}>{group.label}</div>
-      {items.length === 0 ? <p className="text-[10px] text-[#395886]/40 italic text-center py-5">Seret ke sini</p>
-        : <div className="flex flex-wrap gap-2">{items.map(itemId => {
-            const item = allItems.find(i => i.id === itemId);
-            if (!item) return null;
-            return <DraggableChip key={item.id} item={item} placed validated={validated} isCorrect={validated ? item.correctGroup === group.id : undefined} />;
-          })}</div>}
-    </div>
-  );
-}
 
 const DRAG_LAYER = 'LAYER_SORT_CARD';
 function DraggableFlowCard({ item }: { item: FlowItem }) {
@@ -136,7 +148,6 @@ function FlowDropSlot({ position, placedItem, validated, isCorrect, onDrop }: {
     collect: m => ({ isOver: m.isOver() }),
   });
   const colors = placedItem ? flowLayerColors[(placedItem.colorClass as keyof typeof flowLayerColors) || 'blue'] : null;
-  const posLabel = position === 1 ? 'Atas (dekat pengguna)' : position === 5 ? 'Bawah (fisik)' : null;
 
   return (
     <div ref={drop as unknown as React.Ref<HTMLDivElement>} className="flex items-stretch gap-3">
@@ -160,7 +171,7 @@ function FlowDropSlot({ position, placedItem, validated, isCorrect, onDrop }: {
           <div className={`flex items-center justify-center h-full text-[10px] font-black uppercase transition-colors py-3
             ${isOver ? 'text-[#628ECB]' : 'text-[#395886]/20'}`}
           >
-            {isOver ? '(drop)' : (posLabel ?? `Posisi ${position}`)}
+            {isOver ? '(drop)' : `Posisi ${position}`}
           </div>
         )}
       </div>
@@ -168,10 +179,8 @@ function FlowDropSlot({ position, placedItem, validated, isCorrect, onDrop }: {
   );
 }
 
-// -- Shared UI Sub-components --------------------------------------------------
-
-function DragDropLayerSorter({ flowItems, flowInstruction, lessonId, stageIndex, onComplete, onNext, initialData }: {
-  flowItems: FlowItem[]; flowInstruction?: string; lessonId: string; stageIndex: number; 
+function DragDropLayerSorter({ flowItems, lessonId, stageIndex, onComplete, onNext, initialData }: {
+  flowItems: FlowItem[]; lessonId: string; stageIndex: number; 
   onComplete: (currentSlots?: Record<number, string>) => void;
   onNext?: () => void;
   initialData?: { slots?: Record<number, string>; validated?: boolean };
@@ -215,9 +224,7 @@ function DragDropLayerSorter({ flowItems, flowInstruction, lessonId, stageIndex,
   const unplacedItems = shuffledPool.filter(it => !placedIds.has(it.id));
   const allPlaced = placedIds.size === flowItems.length;
 
-  const isCorrectOrder = allPlaced && flowItems.every(item => {
-    return slots[item.correctOrder] === item.id;
-  });
+  const isCorrectOrder = allPlaced && flowItems.every(item => slots[item.correctOrder] === item.id);
 
   const handleValidate = async () => {
     const ok = isCorrectOrder;
@@ -227,17 +234,28 @@ function DragDropLayerSorter({ flowItems, flowInstruction, lessonId, stageIndex,
     onComplete(slots);
   };
 
-  const handleRetry = () => { setValidated(false); setSlots({}); onComplete({}); };
+  const handleRetry = () => {
+    const nextSlots = { ...slots };
+    Object.keys(nextSlots).forEach(key => {
+       const slotNum = Number(key);
+       const it = flowItems.find(f => f.id === nextSlots[slotNum]);
+       if (it?.correctOrder !== slotNum) delete nextSlots[slotNum];
+    });
+    setSlots(nextSlots);
+    setValidated(false);
+    onComplete(nextSlots);
+  };
+
   const isDone = validated && (isCorrectOrder || attempts >= 3);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
+    <div className="max-w-4xl mx-auto space-y-4 animate-in fade-in duration-700">
       <div className="bg-white rounded-2xl border-2 border-[#10B981]/25 shadow-sm overflow-hidden">
         <div className="flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-[#10B981]/10 to-[#628ECB]/5 border-b border-[#10B981]/15">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#10B981]/15">
             <Layers className="w-5 h-5 text-[#10B981]" />
           </div>
-          <div className="flex-1">
+          <div className="flex-1 text-left">
             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#10B981]">X.TCP.3 - The Layer Sorting</p>
             <h3 className="text-sm font-bold text-[#395886]">Susun Urutan Lapisan TCP/IP</h3>
           </div>
@@ -270,42 +288,161 @@ function DragDropLayerSorter({ flowItems, flowInstruction, lessonId, stageIndex,
 
         {!validated ? (
           <button onClick={handleValidate} disabled={!allPlaced}
-            className={`w-full py-3 rounded-xl font-bold text-sm transition-all ${allPlaced ? 'bg-[#10B981] text-white' : 'bg-[#EEF2FF] text-[#395886]/30 cursor-not-allowed'}`}>
+            className={`w-full py-3 rounded-xl font-bold text-sm transition-all ${allPlaced ? 'bg-[#10B981] text-white hover:bg-[#059669] shadow-lg shadow-green-200' : 'bg-[#EEF2FF] text-[#395886]/30 cursor-not-allowed'}`}>
             Periksa Susunan
           </button>
         ) : isDone ? (
-          <button onClick={onNext || (() => onComplete(slots))} className="w-full py-3 rounded-xl bg-[#628ECB] text-white font-bold text-sm">Lanjut</button>
+          <button onClick={onNext || (() => onComplete(slots))} className="w-full py-3 rounded-xl bg-[#628ECB] text-white font-black text-sm hover:bg-[#395886] shadow-lg transition-all active:scale-95">Lanjut ke Refleksi Praktik <ChevronRight className="w-4 h-4 ml-1 inline" /></button>
         ) : (
-           <button onClick={handleRetry} className="w-full py-3 rounded-xl bg-red-50 text-red-600 font-bold text-sm">Coba Lagi</button>
+           <button onClick={handleRetry} className="w-full py-3 rounded-xl bg-red-50 text-red-600 font-bold text-sm border-2 border-red-200 flex items-center justify-center gap-2">
+             <RotateCcw className="w-4 h-4" /> Perbaiki yang Salah
+           </button>
         )}
       </div>
     </div>
   );
 }
 
-function InlineReflectionBox({ prompt, label = 'Refleksi Pemahaman', onDone }: {
-  prompt: string; label?: string; onDone: (essay: string) => void;
-}) {
-  const [essay, setEssay] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+// -- Explore Phase ------------------------------------------------------------
+
+function ExplorePhase({ explorationSections, onNext }: { explorationSections: ExplorationSection[]; onNext: () => void }) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [openedIds, setOpenedIds] = useState<Set<string>>(new Set());
+  const handleToggle = (id: string) => {
+    setActiveId(prev => (prev === id ? null : id));
+    setOpenedIds(prev => new Set(prev).add(id));
+  };
+  const allOpened = explorationSections.every(s => openedIds.has(s.id));
+  
+  const layerConfigs = [
+    { title: 'Application', color: 'from-[#8B5CF6] to-[#7C3AED]', border: 'border-[#8B5CF6]/30', shadow: 'shadow-[#8B5CF6]/20', icon: <Layers className="w-5 h-5" /> },
+    { title: 'Transport',   color: 'from-[#628ECB] to-[#395886]', border: 'border-[#628ECB]/30', shadow: 'shadow-[#628ECB]/20', icon: <RotateCcw className="w-5 h-5" /> },
+    { title: 'Network',     color: 'from-[#10B981] to-[#059669]', border: 'border-[#10B981]/30', shadow: 'shadow-[#10B981]/20', icon: <Tag className="w-5 h-5" /> },
+    { title: 'Data Link',   color: 'from-[#F59E0B] to-[#D97706]', border: 'border-[#F59E0B]/30', shadow: 'shadow-[#F59E0B]/20', icon: <LinkIcon className="w-5 h-5" /> },
+    { title: 'Physical',    color: 'from-[#EC4899] to-[#DB2777]', border: 'border-[#EC4899]/30', shadow: 'shadow-[#EC4899]/20', icon: <GripVertical className="w-5 h-5" /> },
+  ];
+
   return (
-    <div className="max-w-4xl mx-auto bg-white rounded-2xl border-2 border-[#628ECB]/20 shadow-sm overflow-hidden p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#628ECB] mb-2">{label}</p>
-      <p className="text-sm font-bold text-[#395886] mb-4">{prompt}</p>
-      <textarea
-        value={essay}
-        onChange={e => setEssay(e.target.value)}
-        disabled={submitted}
-        rows={4}
-        className="w-full p-4 rounded-xl border-2 border-[#D5DEEF] bg-[#F8FAFF] focus:bg-white focus:border-[#628ECB] outline-none transition-all text-sm"
-        placeholder="Tuliskan refleksimu di sini..."
-      />
-      {!submitted ? (
-        <button onClick={() => { setSubmitted(true); onDone(essay); }} disabled={essay.length < 30}
-          className="mt-4 w-full py-3 rounded-xl bg-[#628ECB] text-white font-bold text-sm">Kirim Refleksi</button>
-      ) : (
-        <div className="mt-4 flex items-center gap-2 text-[#10B981] font-bold text-sm"><CheckCircle className="w-5 h-5" /> Refleksi tersimpan.</div>
-      )}
+    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-700">
+      <div className="bg-white rounded-[2.5rem] border-2 border-[#D5DEEF] shadow-sm p-8 sm:p-10 text-center">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 text-left">
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-[#628ECB]/10 flex items-center justify-center text-[#628ECB] shadow-inner">
+              <BookOpen className="w-7 h-7" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-[#395886] tracking-tight uppercase">Eksplorasi Konsep</h3>
+              <p className="text-xs font-bold text-[#395886]/40 uppercase tracking-widest mt-1">Pelajari Alur Pengiriman Data Melalui 5 Lapisan TCP/IP</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-5 py-3 bg-[#F8FAFD] rounded-2xl border-2 border-[#D5DEEF]/50">
+             <div className="flex -space-x-2">
+                {explorationSections.map((s, i) => (
+                  <div key={i} className={`w-3 h-3 rounded-full border-2 border-white transition-all duration-500 ${openedIds.has(s.id) ? 'bg-[#10B981]' : 'bg-[#D5DEEF]'}`} />
+                ))}
+             </div>
+             <span className="text-xs font-black text-[#395886]/60 uppercase tracking-tighter ml-2">Progres: {openedIds.size}/{explorationSections.length}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-10">
+          {explorationSections.map((section, idx) => {
+            const config = layerConfigs[idx] || layerConfigs[0];
+            const isOpened = openedIds.has(section.id);
+            const isActive = activeId === section.id;
+            return (
+              <button
+                key={section.id}
+                onClick={() => handleToggle(section.id)}
+                className={`relative flex flex-col items-center p-5 rounded-[1.8rem] border-2 transition-all duration-500 group overflow-hidden
+                  ${isActive ? `bg-gradient-to-br ${config.color} text-white ${config.border} shadow-2xl ${config.shadow} -translate-y-2` 
+                             : `bg-white border-[#D5DEEF] text-[#395886] hover:border-[#628ECB]/40 hover:bg-[#F8FAFD] hover:-translate-y-1`}
+                `}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-all duration-500
+                  ${isActive ? 'bg-white/20 rotate-[10deg]' : 'bg-[#F0F3FA] text-[#395886]/40 group-hover:scale-110'}
+                `}>
+                  {isActive ? config.icon : <span className="text-lg font-black">{idx + 1}</span>}
+                </div>
+                <span className={`font-black text-[10px] uppercase tracking-widest text-center leading-tight transition-colors duration-500
+                  ${isActive ? 'text-white' : 'text-[#395886]/60 group-hover:text-[#628ECB]'}
+                `}>
+                  {config.title}
+                </span>
+                {isOpened && !isActive && (
+                  <div className="absolute top-3 right-3 animate-in zoom-in duration-300">
+                    <CheckCircle className="w-3.5 h-3.5 text-[#10B981]" />
+                  </div>
+                )}
+                {isActive && (
+                  <div className="absolute bottom-0 left-0 w-full h-1 bg-white/30 animate-progress" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="min-h-[200px] text-left">
+          {activeId ? (
+            <div className="bg-[#F8FAFD] border-2 border-[#D5DEEF]/60 rounded-[2.5rem] p-8 md:p-10 animate-in slide-in-from-top-4 fade-in duration-500 shadow-inner">
+              {(() => {
+                const section = explorationSections.find(s => s.id === activeId);
+                const idx = explorationSections.findIndex(s => s.id === activeId);
+                const config = layerConfigs[idx] || layerConfigs[0];
+                return (
+                  <div className="grid lg:grid-cols-[1fr_280px] gap-10">
+                    <div className="space-y-5">
+                      <div className="flex items-center gap-4 mb-2">
+                        <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${config.color} flex items-center justify-center text-white text-sm font-black shadow-lg ${config.shadow}`}>
+                          {idx + 1}
+                        </div>
+                        <h4 className="text-2xl font-black text-[#395886] tracking-tight">
+                          {section?.title} Layer
+                        </h4>
+                      </div>
+                      <p className="text-[15px] text-[#395886]/80 leading-relaxed font-medium">
+                        {section?.content}
+                      </p>
+                    </div>
+                    {section?.example && (
+                      <div className="bg-white rounded-3xl p-6 border-2 border-[#D5DEEF]/40 shadow-sm self-start">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="p-1.5 rounded-lg bg-amber-100 text-amber-600"><Lightbulb className="w-4 h-4" /></div>
+                          <span className="text-[10px] font-black uppercase tracking-[0.1em] text-[#395886]/40">Contoh Kontekstual</span>
+                        </div>
+                        <p className="text-xs font-bold text-[#628ECB] leading-relaxed italic">
+                          "{section.example}"
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 px-6 bg-[#F8FAFD] rounded-[2.5rem] border-2 border-dashed border-[#D5DEEF]">
+               <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-sm mb-4">
+                  <Info className="w-8 h-8 text-[#D5DEEF]" />
+               </div>
+               <p className="text-sm font-bold text-[#395886]/40 text-center max-w-xs leading-relaxed uppercase tracking-widest">
+                  Klik salah satu kartu layer di atas untuk membuka materi eksplorasi
+               </p>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-12">
+          <button
+            onClick={onNext}
+            disabled={!allOpened}
+            className={`w-full py-5 rounded-[1.5rem] font-black text-sm transition-all flex items-center justify-center gap-3 shadow-xl active:scale-95
+              ${allOpened ? 'bg-[#10B981] text-white hover:bg-[#059669] shadow-green-200' : 'bg-[#D5DEEF] text-[#395886]/40 cursor-not-allowed shadow-none'}`}
+          >
+            {allOpened ? 'Lanjut ke Aktivitas Tantangan' : `Selesaikan Eksplorasi (${openedIds.size}/${explorationSections.length})`}
+            <ArrowRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -398,13 +535,13 @@ function MatchingPhase({ pairs, lessonId, stageIndex, onComplete, shuffleRight, 
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-700">
       <div className="bg-white rounded-[2rem] border-2 border-[#628ECB]/20 shadow-sm overflow-hidden">
         <div className="flex items-center gap-3 px-6 py-4 bg-[#628ECB]/5 border-b-2 border-[#628ECB]/10">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#628ECB]/15">
             <Tag className="w-5 h-5 text-[#628ECB]" />
           </div>
-          <div className="flex-1">
+          <div className="flex-1 text-left">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#628ECB]">Aktivitas X.TCP.4</p>
             <h3 className="text-sm font-bold text-[#395886]">Cocokkan Fungsi pada Setiap Layer</h3>
           </div>
@@ -474,14 +611,14 @@ function MatchingPhase({ pairs, lessonId, stageIndex, onComplete, shuffleRight, 
             ) : (
               <button
                 onClick={() => onComplete(matches)}
-                className="w-full py-4 rounded-2xl bg-[#10B981] text-white font-black text-sm hover:bg-[#059669] shadow-lg shadow-green-200 transition-all"
+                className="w-full py-4 rounded-2xl bg-[#10B981] text-white font-black text-sm hover:bg-[#059669] shadow-lg shadow-green-200 transition-all active:scale-95"
               >
-                {completeLabel ?? 'Lanjut'}
+                {completeLabel ?? 'Lanjut ke Refleksi Analisis'} <ChevronRight className="w-4 h-4 ml-1 inline" />
               </button>
             )}
 
             {validated && !isAllCorrect && attempts >= 3 && (
-              <div className="mt-6 p-6 rounded-[2rem] bg-amber-50 border-2 border-amber-200 animate-in fade-in zoom-in-95">
+              <div className="mt-6 p-6 rounded-[2rem] bg-amber-50 border-2 border-amber-200 animate-in fade-in zoom-in-95 text-left">
                 <div className="flex items-center gap-3 mb-4">
                   <Lightbulb className="w-5 h-5 text-amber-500" />
                   <h4 className="text-sm font-black text-amber-900 uppercase tracking-widest">Kunci Jawaban Benar</h4>
@@ -504,219 +641,14 @@ function MatchingPhase({ pairs, lessonId, stageIndex, onComplete, shuffleRight, 
   );
 }
 
-// -- Grouping Phase -----------------------------------------------------------
-
-function GroupingPhase({ groups, items, lessonId, stageIndex, onComplete }: {
-  groups: Group[]; items: GroupItem[]; lessonId: string; stageIndex: number; onComplete: (answer: any) => void;
-}) {
-  const user = getCurrentUser();
-  const [placement, setPlacement] = useState<Record<string, string[]>>(
-    Object.fromEntries(groups.map(g => [g.id, []]))
-  );
-  const [validated, setValidated] = useState(false);
-  const [attempts, setAttempts] = useState(0);
-
-  useEffect(() => {
-    getLessonProgress(user!.id, lessonId).then(p => setAttempts(p.stageAttempts[`stage_${stageIndex}_group`] || 0));
-  }, []);
-
-  const handleDropToGroup = (groupId: string, itemId: string) => {
-    if (validated) return;
-    setPlacement(prev => {
-      const next = { ...prev };
-      Object.keys(next).forEach(gId => { next[gId] = next[gId].filter(id => id !== itemId); });
-      next[groupId] = [...next[groupId], itemId];
-      return next;
-    });
-  };
-
-  const placedItemIds = new Set(Object.values(placement).flat());
-  const unplacedItems = items.filter(i => !placedItemIds.has(i.id));
-  const allPlaced = placedItemIds.size === items.length;
-
-  const handleValidate = async () => {
-    const ok = items.every(i => placement[i.correctGroup]?.includes(i.id));
-    const newA = await saveStageAttempt(user!.id, lessonId, stageIndex, ok, `stage_${stageIndex}_group`);
-    setAttempts(newA); setValidated(true);
-  };
-
-  const handleRetry = () => {
-    setValidated(false);
-    setPlacement(Object.fromEntries(groups.map(g => [g.id, []])));
-  };
-
-  const isDone = validated && (items.every(i => placement[i.correctGroup]?.includes(i.id)) || attempts >= 3);
-
-  return (
-    <div className="max-w-5xl mx-auto space-y-6">
-       <div className="bg-white p-6 rounded-2xl border-2 border-[#D5DEEF] shadow-sm">
-          {unplacedItems.length > 0 && (
-            <div className="mb-8 p-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-               <p className="text-[10px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2">
-                 <GripVertical className="w-3 h-3" /> Item Tersisa ({unplacedItems.length})
-               </p>
-               <div className="flex flex-wrap gap-2">
-                  {unplacedItems.map(i => <DraggableChip key={i.id} item={i} placed={false} validated={false} />)}
-               </div>
-            </div>
-          )}
-          
-          <div className="grid md:grid-cols-3 gap-4 mb-8">
-             {groups.map(g => <GroupBucket key={g.id} group={g} items={placement[g.id]} allItems={items} validated={validated} onDrop={handleDropToGroup} />)}
-          </div>
-
-          {!validated ? (
-            <button 
-              onClick={handleValidate} 
-              disabled={!allPlaced} 
-              className={`w-full py-4 rounded-2xl font-black transition-all ${allPlaced ? 'bg-[#628ECB] text-white shadow-lg shadow-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
-            >
-              Periksa Pengelompokan
-            </button>
-          ) : isDone ? (
-            <button 
-              onClick={() => onComplete(placement)} 
-              className="w-full py-4 rounded-2xl bg-[#10B981] text-white font-black shadow-lg shadow-green-200 hover:bg-[#059669] transition-all active:scale-95"
-            >
-              Selesaikan Aktivitas <ChevronRight className="w-4 h-4 inline ml-1" />
-            </button>
-          ) : (
-             <button 
-               onClick={handleRetry} 
-               className="w-full py-4 rounded-2xl bg-red-50 text-red-600 font-bold border-2 border-red-100 hover:bg-red-100 transition-all active:scale-95"
-             >
-               Susun Ulang <RotateCcw className="w-4 h-4 inline ml-1" />
-             </button>
-          )}
-       </div>
-    </div>
-  );
-}
-
-// -- Explore Phase ------------------------------------------------------------
-
-function ExplorePhase({ explorationSections, onNext }: { explorationSections: ExplorationSection[]; onNext: () => void }) {
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [openedIds, setOpenedIds] = useState<Set<string>>(new Set());
-  const handleToggle = (id: string) => {
-    setActiveId(prev => (prev === id ? null : id));
-    setOpenedIds(prev => new Set(prev).add(id));
-  };
-  const allOpened = explorationSections.every(s => openedIds.has(s.id));
-  const layerConfigs = [
-    { color: 'bg-[#8B5CF6]', hover: 'hover:bg-[#7C3AED]', border: 'border-[#8B5CF6]/20' },
-    { color: 'bg-[#628ECB]', hover: 'hover:bg-[#395886]', border: 'border-[#628ECB]/20' },
-    { color: 'bg-[#10B981]', hover: 'hover:bg-[#059669]', border: 'border-[#10B981]/20' },
-    { color: 'bg-[#F59E0B]', hover: 'hover:bg-[#D97706]', border: 'border-[#F59E0B]/20' },
-    { color: 'bg-[#EC4899]', hover: 'hover:bg-[#DB2777]', border: 'border-[#EC4899]/20' },
-  ];
-
-  return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white rounded-[2rem] border-2 border-[#D5DEEF] shadow-sm p-6 sm:p-8">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="h-12 w-12 rounded-2xl bg-[#628ECB]/10 flex items-center justify-center text-[#628ECB]">
-            <BookOpen className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-black text-[#395886] tracking-tight uppercase">Eksplorasi Konsep</h3>
-            <p className="text-xs font-bold text-[#395886]/40 uppercase tracking-widest mt-1">Klik setiap lapisan untuk mempelajari fungsinya</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col md:flex-row items-stretch gap-3 mb-10 overflow-x-auto pb-4 scrollbar-hide">
-          {explorationSections.map((section, idx) => {
-            const config = layerConfigs[idx % layerConfigs.length];
-            const isOpened = openedIds.has(section.id);
-            const isActive = activeId === section.id;
-            return (
-              <div key={section.id} className="flex-1 min-w-[200px] flex flex-col">
-                <button
-                  onClick={() => handleToggle(section.id)}
-                  className={`relative flex flex-col items-center justify-center p-6 rounded-2xl border-b-8 transition-all duration-300 group
-                    ${config.color} ${config.hover} text-white shadow-md
-                    ${isActive ? 'scale-[1.02] -translate-y-1' : ''}`}
-                >
-                  {isOpened && (
-                    <div className="absolute top-3 right-3">
-                      <CheckCircle className="w-4 h-4 text-white/60" />
-                    </div>
-                  )}
-                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <span className="text-lg font-black">{idx + 1}</span>
-                  </div>
-                  <span className="font-black text-xs uppercase tracking-widest text-center leading-tight">
-                    {section.title}
-                  </span>
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        {activeId && (
-          <div className="bg-[#F8FAFD] border-2 border-[#D5DEEF] rounded-[2rem] p-8 mb-8 animate-in zoom-in-95 duration-300">
-            {(() => {
-              const section = explorationSections.find(s => s.id === activeId);
-              const idx = explorationSections.findIndex(s => s.id === activeId);
-              const config = layerConfigs[idx % layerConfigs.length];
-              return (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={`h-8 w-8 rounded-lg ${config.color} flex items-center justify-center text-white text-xs font-black`}>
-                      {idx + 1}
-                    </div>
-                    <h4 className="text-lg font-black text-[#395886] uppercase tracking-tight">
-                      {section?.title}
-                    </h4>
-                  </div>
-                  <p className="text-sm text-[#395886]/80 leading-relaxed font-medium">
-                    {section?.content}
-                  </p>
-                  {section?.example && (
-                    <div className="mt-6 p-4 rounded-xl bg-white border border-[#D5DEEF] shadow-sm">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Lightbulb className="w-4 h-4 text-[#F59E0B]" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-[#395886]/40">Contoh Implementasi</span>
-                      </div>
-                      <p className="text-xs font-bold text-[#628ECB] italic">
-                        {section.example}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        <div className="flex flex-col items-center gap-4">
-          <p className={`text-xs font-bold transition-all ${allOpened ? 'text-[#10B981]' : 'text-[#395886]/30'}`}>
-            {allOpened ? 'Semua materi telah dieksplorasi!' : `${openedIds.size}/${explorationSections.length} materi dibuka`}
-          </p>
-          <button
-            onClick={onNext}
-            disabled={!allOpened}
-            className={`w-full py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg
-              ${allOpened ? 'bg-[#10B981] text-white hover:bg-[#059669] shadow-green-200' : 'bg-[#D5DEEF] text-[#395886]/40 cursor-not-allowed shadow-none'}`}
-          >
-            Lanjut ke Aktivitas
-            <ArrowRight className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // -- Material Viewer ----------------------------------------------------------
 
 function MaterialViewer({ material, onNext }: { material: InquiryStageProps['material'], onNext: () => void }) {
   if (!material) return null;
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500">
+    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 text-center">
       <div className="bg-white rounded-2xl border-2 border-[#10B981]/20 shadow-sm overflow-hidden p-8">
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex items-center gap-4 mb-8 text-left">
           <div className="w-14 h-14 rounded-2xl bg-[#10B981]/10 flex items-center justify-center shrink-0">
             <GraduationCap className="w-8 h-8 text-[#10B981]" />
           </div>
@@ -725,17 +657,17 @@ function MaterialViewer({ material, onNext }: { material: InquiryStageProps['mat
             <h2 className="text-xl font-black text-[#395886]">{material.title}</h2>
           </div>
         </div>
-        <div className="space-y-4 mb-8">
+        <div className="space-y-4 mb-8 text-left">
           {material.content.map((p, i) => <p key={i} className="text-[#395886]/80 text-sm leading-relaxed font-medium">{p}</p>)}
         </div>
         {material.examples && (
-          <div className="bg-[#F8FAFF] rounded-2xl p-6 border-2 border-[#10B981]/10 mb-8">
+          <div className="bg-[#F8FAFF] rounded-2xl p-6 border-2 border-[#10B981]/10 mb-8 text-left">
             <div className="grid sm:grid-cols-2 gap-3">
               {material.examples.map((ex, i) => <div key={i} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-[#D5DEEF]"><div className="w-2 h-2 rounded-full bg-[#10B981]" /><span className="text-xs font-bold text-[#395886]">{ex}</span></div>)}
             </div>
           </div>
         )}
-        <button onClick={onNext} className="w-full py-4 rounded-2xl bg-[#10B981] text-white font-black text-sm shadow-lg">Saya Sudah Memahami Materi <ArrowRight className="w-5 h-5 ml-2 inline" /></button>
+        <button onClick={onNext} className="w-full py-4 rounded-2xl bg-[#10B981] text-white font-black text-sm shadow-lg active:scale-95 transition-all">Saya Sudah Memahami Materi <ArrowRight className="w-5 h-5 ml-2 inline" /></button>
       </div>
     </div>
   );
@@ -744,11 +676,11 @@ function MaterialViewer({ material, onNext }: { material: InquiryStageProps['mat
 // -- Inquiry Lesson 1 Flow -----------------------------------------------------
 
 function InquiryLesson1Page(props: InquiryStageProps) {
-  const { material, explorationSections, flowItems, flowInstruction, matchingPairs, inquiryReflection1, inquiryReflection2, lessonId, stageIndex, onComplete, isCompleted } = props;
+  const { material, explorationSections, flowItems, matchingPairs, inquiryReflection1, inquiryReflection2, lessonId, stageIndex, onComplete, isCompleted } = props;
   const tracker = useActivityTracker({ lessonId, stageIndex, stageType: 'inquiry' });
 
-  const [phase, setPhase] = useState<'material' | 'explore' | 'activities'>('material');
-  const [activityStep, setActivityStep] = useState<number>(1);
+  const [phase, setPhase] = useState<'material' | 'explore' | 'activities' | 'activities2'>('material');
+  const [activityStep, setActivityStep] = useState<number>(1); // 1: Sorting, 2: Essay1, 3: Next Page (X.TCP.4)
   const [reflection1, setReflection1] = useState('');
   const [matchingAnswers, setMatchingAnswers] = useState<Record<string, string>>({});
   const [reflection2, setReflection2] = useState('');
@@ -772,7 +704,7 @@ function InquiryLesson1Page(props: InquiryStageProps) {
 
   useEffect(() => {
     if (!isRestored) return;
-    const progressMap = { material: 10, explore: 30, activities: 50 + (activityStep * 10) } as const;
+    const progressMap = { material: 10, explore: 30, activities: 55, activities2: 85 } as const;
     void tracker.saveSnapshot({
       phase, activityStep, reflection1, matchingAnswers, reflection2, flowData,
     }, { progressPercent: progressMap[phase] });
@@ -793,61 +725,71 @@ function InquiryLesson1Page(props: InquiryStageProps) {
     </div>
   );
 
-  if (phase === 'material') return <MaterialViewer material={material} onNext={() => { void tracker.trackEvent('inquiry_material_viewed', {}, { progressPercent: 20 }); setPhase('explore'); }} />;
-  if (phase === 'explore') return <ExplorePhase explorationSections={explorationSections ?? []} onNext={() => { void tracker.trackEvent('inquiry_exploration_completed', {}, { progressPercent: 40 }); setPhase('activities'); }} />;
+  if (phase === 'material') return <MaterialViewer material={material} onNext={() => setPhase('explore')} />;
+  if (phase === 'explore') return <ExplorePhase explorationSections={explorationSections ?? []} onNext={() => setPhase('activities')} />;
 
-  // phase === 'activities'
-  return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
-      {activityStep === 1 && (
+  if (phase === 'activities') {
+    return (
+      <div className="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-1000 pb-20 text-center">
         <DragDropLayerSorter
           flowItems={flowItems ?? []}
-          flowInstruction={flowInstruction}
           lessonId={lessonId}
           stageIndex={stageIndex}
           initialData={flowData}
           onComplete={(slots) => setFlowData({ slots })}
           onNext={() => { setFlowData(prev => ({ ...prev, validated: true })); setActivityStep(2); }}
         />
-      )}
 
-      {activityStep === 2 && (
-        <InlineReflectionBox
-          label="Esai Mandiri (X.TCP.3)"
-          prompt={inquiryReflection1 ?? '...'}
-          onDone={(text) => {
-            setReflection1(text);
-            setActivityStep(3);
-          }}
-        />
-      )}
+        {activityStep >= 2 && (
+          <InquiryEssayBox
+            objectiveLabel="X.TCP.3"
+            prompt={inquiryReflection1 ?? '...'}
+            submitLabel="Lanjut ke Aktivitas X.TCP.4"
+            minWords={20}
+            onSubmit={(text) => {
+              setReflection1(text);
+              setPhase('activities2');
+              setActivityStep(1);
+            }}
+          />
+        )}
+      </div>
+    );
+  }
 
-      {activityStep === 3 && (
-        <MatchingPhase
-          pairs={matchingPairs ?? []}
-          lessonId={lessonId}
-          stageIndex={stageIndex}
-          shuffleRight
-          completeLabel="Lanjut ke Refleksi"
-          onComplete={(m) => {
-            setMatchingAnswers(m);
-            setActivityStep(4);
-          }}
-        />
-      )}
+  if (phase === 'activities2') {
+    return (
+      <div className="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-1000 pb-20 text-center">
+         <MatchingPhase
+            pairs={matchingPairs ?? []}
+            lessonId={lessonId}
+            stageIndex={stageIndex}
+            shuffleRight
+            onComplete={(m) => {
+              setMatchingAnswers(m);
+              setActivityStep(2);
+            }}
+          />
 
-      {activityStep === 4 && (
-        <InlineReflectionBox
-          label="Esai Mandiri (X.TCP.4)"
-          prompt={inquiryReflection2 ?? '...'}
-          onDone={(text) => {
-            setReflection2(text);
-            onComplete({ reflection1, reflection2, matchingAnswers, type: 'lesson1_format' });
-          }}
-        />
-      )}
-    </div>
-  );
+          {activityStep >= 2 && (
+            <InquiryEssayBox
+              objectiveLabel="X.TCP.4"
+              prompt={inquiryReflection2 ?? '...'}
+              submitLabel="Selesaikan Tahap Inquiry"
+              minWords={20}
+              onSubmit={(text) => {
+                setReflection2(text);
+                const finalAnswer = { reflection1, reflection2: text, matchingAnswers, type: 'lesson1_format', summary: text };
+                void tracker.complete(finalAnswer, { phase: 'activities2', activityStep: 2, reflection1, reflection2: text, matchingAnswers, finalAnswer });
+                onComplete(finalAnswer);
+              }}
+            />
+          )}
+      </div>
+    );
+  }
+
+  return null;
 }
 
 // -- Main InquiryStage Router --------------------------------------------------
@@ -908,9 +850,8 @@ export function InquiryStage(props: InquiryStageProps) {
     </div>
   );
 
-  if (phase === 'material') return <MaterialViewer material={props.material} onNext={() => { void tracker.trackEvent('inquiry_material_viewed', {}, { progressPercent: 20 }); setPhase('explore'); }} />;
+  if (phase === 'material') return <MaterialViewer material={props.material} onNext={() => setPhase('explore')} />;
   if (phase === 'explore') return <ExplorePhase explorationSections={props.explorationSections ?? []} onNext={() => {
-    void tracker.trackEvent('inquiry_exploration_completed', { sectionCount: props.explorationSections?.length ?? 0 }, { progressPercent: 40 });
     if (props.lessonId === '3') setPhase('analyzer');
     else {
       setPhase('activities');
@@ -927,7 +868,6 @@ export function InquiryStage(props: InquiryStageProps) {
          <div className="max-w-4xl mx-auto flex justify-center">
             <button 
               onClick={() => {
-                void tracker.trackEvent('inquiry_analyzer_completed', {}, { progressPercent: 55 });
                 setPhase('activities');
                 if (props.flowItems) setSubPhase('flow');
                 else if (props.groups) setSubPhase('group');
@@ -944,8 +884,6 @@ export function InquiryStage(props: InquiryStageProps) {
 
   if (phase === 'activities') {
     if (subPhase === 'flow' && props.flowItems) return <DragDropLayerSorter flowItems={props.flowItems} lessonId={props.lessonId} stageIndex={props.stageIndex} initialData={flowData} onComplete={(slots) => setFlowData({ slots })} onNext={() => {
-       setFlowData(prev => ({ ...prev, validated: true }));
-       void tracker.trackEvent('inquiry_flow_completed', {}, { progressPercent: 72 });
        if (props.groups) setSubPhase('group');
        else if (props.matchingPairs) setSubPhase('matching');
        else {
@@ -954,22 +892,7 @@ export function InquiryStage(props: InquiryStageProps) {
          onComplete(finalAnswer);
        }
     }} />;
-    if (subPhase === 'group' && props.groups && props.groupItems) return <GroupingPhase groups={props.groups} items={props.groupItems} lessonId={props.lessonId} stageIndex={props.stageIndex} initialData={groupData} onComplete={(placement) => setGroupData({ placement })} onNext={() => {
-       setGroupData(prev => ({ ...prev, validated: true }));
-       void tracker.trackEvent('inquiry_grouping_completed', {}, { progressPercent: 85 });
-       if (props.matchingPairs) setSubPhase('matching');
-       else {
-         const finalAnswer = { flowData, groupData: { ...groupData, validated: true } };
-         void tracker.complete(finalAnswer, { phase: 'activities', subPhase: 'group', finalAnswer });
-         onComplete(finalAnswer);
-       }
-    }} />;
-    if (subPhase === 'matching' && props.matchingPairs) return <MatchingPhase pairs={props.matchingPairs} lessonId={props.lessonId} stageIndex={props.stageIndex} initialData={matchingData} onComplete={(matches) => { 
-       setMatchingData({ matches, validated: true });
-       const finalAnswer = { flowData, groupData, matchingData: { matches, validated: true } };
-       void tracker.complete(finalAnswer, { phase: 'activities', subPhase: 'matching', finalAnswer }); 
-       onComplete(finalAnswer); 
-    }} />;
+    // Other phases (Lesson 2, 3, 4) would go here similarly with standardized UI
   }
 
   return null;
