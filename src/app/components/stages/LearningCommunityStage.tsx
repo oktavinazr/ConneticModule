@@ -3,27 +3,13 @@ import {
   ChevronRight, CheckCircle, XCircle, Users, Link as LinkIcon, FileSearch,
   MessageSquare, Info, RotateCcw, AlertCircle, ThumbsUp, ArrowUpDown, GripVertical,
   Zap, Database, Cpu, Cable, Network, ShieldCheck, PlayCircle, Eye, ArrowRight,
-  Vote, Award, Sparkles, Monitor
+  Vote, Award, Sparkles, Monitor, PenLine
 } from 'lucide-react';
 import { getCurrentUser } from '../../utils/auth';
 import { getLessonProgress, saveStageAttempt } from '../../utils/progress';
-import { supabase } from '../../utils/supabase';
+import { createGroupDiscussion, getGroupDiscussions, toggleGroupDiscussionVote, type GroupDiscussion } from '../../utils/groups';
 
 // -- Types ----------------------------------------------------------------------
-
-interface GroupDiscussion {
-  id: string;
-  lesson_id: string;
-  module_id: string;
-  group_name: string;
-  user_id: string;
-  user_name: string;
-  argument: string;
-  choice_id?: string;
-  choice_text?: string;
-  votes: string[]; // array of user IDs
-  created_at: string;
-}
 
 interface CaseStudy {
   id: string;
@@ -131,34 +117,34 @@ function DiscussionPhase({
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
   useEffect(() => {
-    fetchDiscussions();
-    const channel = supabase.channel(`discussion-${groupName}-${moduleId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_discussions', filter: `group_name=eq.${groupName}` }, () => fetchDiscussions())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [groupName, moduleId]);
+    void fetchDiscussions();
+  }, [groupName, lessonId, moduleId, user?.id]);
 
   const fetchDiscussions = async () => {
-    const { data } = await supabase.from('group_discussions').select('*').eq('lesson_id', lessonId).eq('module_id', moduleId).eq('group_name', groupName).order('created_at', { ascending: true });
-    if (data) {
-      setDiscussions(data);
-      if (data.some(d => d.user_id === user!.id)) setHasSubmitted(true);
-    }
+    const data = await getGroupDiscussions(lessonId, moduleId, groupName);
+    setDiscussions(data);
+    setHasSubmitted(data.some((d) => d.user_id === user!.id));
   };
 
   const submitArgument = async () => {
     if (argument.trim().length < 10) return;
-    const { error } = await supabase.from('group_discussions').insert({
-      lesson_id: lessonId, module_id: moduleId, group_name: groupName, user_id: user!.id, user_name: user!.name, argument: argument.trim(), choice_id: initialChoice.id, choice_text: initialChoice.text, votes: []
+    await createGroupDiscussion({
+      lesson_id: lessonId,
+      module_id: moduleId,
+      group_name: groupName,
+      user_id: user!.id,
+      user_name: user!.name,
+      argument: argument.trim(),
+      choice_id: initialChoice.id,
+      choice_text: initialChoice.text,
     });
-    if (!error) { setArgument(''); setHasSubmitted(true); fetchDiscussions(); }
+    setArgument('');
+    await fetchDiscussions();
   };
 
   const handleVote = async (discId: string) => {
-    const disc = discussions.find(d => d.id === discId);
-    if (!disc) return;
-    const newVotes = disc.votes.includes(user!.id) ? disc.votes.filter(id => id !== user!.id) : [...disc.votes, user!.id];
-    await supabase.from('group_discussions').update({ votes: newVotes }).eq('id', discId);
+    await toggleGroupDiscussionVote(discId, user!.id);
+    await fetchDiscussions();
   };
 
   return (
@@ -337,13 +323,13 @@ function ModuleFlow({
   const [discussions, setDiscussions] = useState<GroupDiscussion[]>([]);
 
   const fetchResults = async () => {
-    const { data } = await supabase.from('group_discussions').select('*').eq('lesson_id', lessonId).eq('module_id', moduleId).eq('group_name', groupName).order('votes', { ascending: false });
-    if (data) setDiscussions(data);
+    const data = await getGroupDiscussions(lessonId, moduleId, groupName);
+    setDiscussions([...data].sort((a, b) => b.votes.length - a.votes.length));
   };
 
   if (phase === 'concept') return <ConceptPhase title={title} concept={concept} layers={layers} isEncapsulation={isEncapsulation} onNext={() => setPhase('case')} />;
   if (phase === 'case') return <CasePhase study={study} onNext={(id, text) => { setInitialChoice({ id, text }); setPhase('discussion'); }} />;
-  if (phase === 'discussion') return <DiscussionPhase lessonId={lessonId} moduleId={moduleId} groupName={groupName} initialChoice={initialChoice!} onNext={() => { fetchResults(); setPhase('result'); }} />;
+  if (phase === 'discussion') return <DiscussionPhase lessonId={lessonId} moduleId={moduleId} groupName={groupName} initialChoice={initialChoice!} onNext={async () => { await fetchResults(); setPhase('result'); }} />;
   if (phase === 'result') return <ResultPhase discussions={discussions} onDone={() => onModuleDone({ discussions, choice: initialChoice })} />;
   return null;
 }

@@ -14,7 +14,6 @@ import {
   getAdminTestQuestions,
   saveAdminTestQuestions,
   resetAdminTestQuestions,
-  syncQuestionsFromSupabase,
   isTestOverridden,
 } from '../../utils/adminData';
 import {
@@ -74,9 +73,12 @@ export function QuestionManagementSection() {
   const [saving, setSaving] = useState(false);
 
   async function refresh() {
-    await syncQuestionsFromSupabase(currentKey);
-    setQuestions(getAdminTestQuestions(currentKey));
-    setOverridden(isTestOverridden(currentKey));
+    const [qs, overrideExists] = await Promise.all([
+      getAdminTestQuestions(currentKey),
+      isTestOverridden(currentKey),
+    ]);
+    setQuestions(qs);
+    setOverridden(overrideExists);
   }
 
   useEffect(() => { refresh(); }, [currentKey]);

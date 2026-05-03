@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ChevronDown,
   CheckCircle,
@@ -21,6 +21,7 @@ import {
 import { lessons, type Stage, type TestQuestion } from '../../data/lessons';
 import {
   getStageOverride,
+  loadAllStageOverrides,
   saveStageOverride,
   resetStageOverride,
   hasStageOverride,
@@ -101,18 +102,24 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 interface QForm { question: string; options: string[]; correctAnswer: number }
 const emptyQForm = (): QForm => ({ question: '', options: ['', '', '', ''], correctAnswer: 0 });
 
-export function QuestionCRUD({ testKey, title }: { testKey: string; title: string }) {
-  const [questions, setQs] = useState<TestQuestion[]>(() => getAdminTestQuestions(testKey));
-  const [overridden, setOverridden] = useState(() => isTestOverridden(testKey));
+export function QuestionCRUD({ testKey, title, onUpdate }: { testKey: string; title: string; onUpdate?: () => void | Promise<void> }) {
+  const [questions, setQs] = useState<TestQuestion[]>([]);
+  const [overridden, setOverridden] = useState(false);
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [form, setForm] = useState<QForm>(emptyQForm());
   const [delIdx, setDelIdx] = useState<number | null>(null);
   const [resetConfirm, setResetConfirm] = useState(false);
 
-  function refresh() {
-    setQs(getAdminTestQuestions(testKey));
-    setOverridden(isTestOverridden(testKey));
+  async function refresh() {
+    const [qs, ov] = await Promise.all([
+      getAdminTestQuestions(testKey),
+      isTestOverridden(testKey),
+    ]);
+    setQs(qs);
+    setOverridden(ov);
   }
+
+  useEffect(() => { refresh(); }, [testKey]);
 
   function openAdd() { setForm(emptyQForm()); setEditIdx(-1); }
   function openEdit(i: number) {
@@ -122,28 +129,31 @@ export function QuestionCRUD({ testKey, title }: { testKey: string; title: strin
   }
   function closeModal() { setEditIdx(null); }
 
-  function save() {
+  async function save() {
     if (!form.question.trim() || form.options.some(o => !o.trim())) return;
     const nq: TestQuestion = { question: form.question.trim(), options: form.options.map(o => o.trim()), correctAnswer: form.correctAnswer };
     const updated = [...questions];
     if (editIdx === -1) updated.push(nq);
     else if (editIdx !== null) updated[editIdx] = nq;
-    saveAdminTestQuestions(testKey, updated);
-    refresh();
+    await saveAdminTestQuestions(testKey, updated);
+    await refresh();
+    await onUpdate?.();
     closeModal();
   }
 
-  function confirmDel() {
+  async function confirmDel() {
     if (delIdx === null) return;
-    saveAdminTestQuestions(testKey, questions.filter((_, i) => i !== delIdx));
+    await saveAdminTestQuestions(testKey, questions.filter((_, i) => i !== delIdx));
     setDelIdx(null);
-    refresh();
+    await refresh();
+    await onUpdate?.();
   }
 
-  function handleReset() {
-    resetAdminTestQuestions(testKey);
+  async function handleReset() {
+    await resetAdminTestQuestions(testKey);
     setResetConfirm(false);
-    refresh();
+    await refresh();
+    await onUpdate?.();
   }
 
   return (
@@ -318,7 +328,7 @@ export function StageEditModal({
   lessonId: string;
   stageIndex: number;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: () => void | Promise<void>;
 }) {
   const [form, setForm] = useState<StageOverride>({ ...override });
   const meta = CTL_META[stage.type] ?? CTL_META.constructivism;
@@ -327,15 +337,15 @@ export function StageEditModal({
     setForm(f => ({ ...f, [key]: value }));
   }
 
-  function save() {
-    saveStageOverride(lessonId, stageIndex, form);
-    onSaved();
+  async function save() {
+    await saveStageOverride(lessonId, stageIndex, form);
+    await onSaved();
     onClose();
   }
 
-  function reset() {
-    resetStageOverride(lessonId, stageIndex);
-    onSaved();
+  async function reset() {
+    await resetStageOverride(lessonId, stageIndex);
+    await onSaved();
     onClose();
   }
 
@@ -694,7 +704,39 @@ export function ActivityManagementSection() {
   const [editingStage, setEditingStage] = useState<{ lessonId: string; stageIndex: number } | null>(null);
   const [, forceUpdate] = useState(0);
 
+  const [overrideMap, setOverrideMap] = useState<Record<string, boolean>>({});
+  const [questionCountMap, setQuestionCountMap] = useState<Record<string, number>>({});
+
   const lessonList = Object.values(lessons);
+
+  const refreshOverrides = useCallback(async () => {
+    await loadAllStageOverrides();
+
+    const keys: string[] = [];
+    lessonList.forEach(l => {
+      keys.push(`lesson_${l.id}_pretest`);
+      keys.push(`lesson_${l.id}_posttest`);
+    });
+
+    const overrides: Record<string, boolean> = {};
+    const counts: Record<string, number> = {};
+
+    await Promise.all(keys.map(async key => {
+      const [qs, overridden] = await Promise.all([
+        getAdminTestQuestions(key),
+        isTestOverridden(key)
+      ]);
+      overrides[key] = overridden;
+      counts[key] = qs.length;
+    }));
+
+    setOverrideMap(overrides);
+    setQuestionCountMap(counts);
+  }, [lessonList]);
+
+  useEffect(() => {
+    refreshOverrides();
+  }, [refreshOverrides]);
 
   function toggleSub(lessonId: string, sub: string) {
     setExpandedSub(prev => ({ ...prev, [lessonId]: prev[lessonId] === sub ? null : sub }));
@@ -716,8 +758,12 @@ export function ActivityManagementSection() {
         {lessonList.map(lesson => {
           const isOpen = expandedLesson === lesson.id;
           const modCount = lesson.stages.filter((_, si) => hasStageOverride(lesson.id, si)).length;
-          const preOverride = isTestOverridden(`lesson_${lesson.id}_pretest`);
-          const postOverride = isTestOverridden(`lesson_${lesson.id}_posttest`);
+          
+          const preKey = `lesson_${lesson.id}_pretest`;
+          const postKey = `lesson_${lesson.id}_posttest`;
+          
+          const preOverride = overrideMap[preKey] || false;
+          const postOverride = overrideMap[postKey] || false;
           const totalMod = modCount + (preOverride ? 1 : 0) + (postOverride ? 1 : 0);
 
           return (
@@ -761,7 +807,7 @@ export function ActivityManagementSection() {
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-xs font-bold bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20 px-2.5 py-1 rounded-full">Pre-Test</span>
-                        <span className="text-sm font-semibold text-[#395886]">{getAdminTestQuestions(`lesson_${lesson.id}_pretest`).length} soal</span>
+                        <span className="text-sm font-semibold text-[#395886]">{questionCountMap[preKey] ?? 0} soal</span>
                         {preOverride && <span className="text-xs font-bold text-[#F59E0B] flex items-center gap-1"><AlertCircle className="w-3 h-3" />Dimodifikasi</span>}
                       </div>
                       <ChevronDown className={`w-4 h-4 text-[#395886]/40 transition-transform ${expandedSub[lesson.id] === 'pretest' ? 'rotate-180' : ''}`} />
@@ -769,8 +815,9 @@ export function ActivityManagementSection() {
                     {expandedSub[lesson.id] === 'pretest' && (
                       <div className="px-6 py-4">
                         <QuestionCRUD
-                          testKey={`lesson_${lesson.id}_pretest`}
+                          testKey={preKey}
                           title={`Pre-Test ${lesson.title}`}
+                          onUpdate={refreshOverrides}
                         />
                       </div>
                     )}
@@ -831,7 +878,7 @@ export function ActivityManagementSection() {
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-xs font-bold bg-[#F59E0B]/10 text-[#F59E0B] border border-[#F59E0B]/20 px-2.5 py-1 rounded-full">Post-Test</span>
-                        <span className="text-sm font-semibold text-[#395886]">{getAdminTestQuestions(`lesson_${lesson.id}_posttest`).length} soal</span>
+                        <span className="text-sm font-semibold text-[#395886]">{questionCountMap[postKey] ?? 0} soal</span>
                         {postOverride && <span className="text-xs font-bold text-[#F59E0B] flex items-center gap-1"><AlertCircle className="w-3 h-3" />Dimodifikasi</span>}
                       </div>
                       <ChevronDown className={`w-4 h-4 text-[#395886]/40 transition-transform ${expandedSub[lesson.id] === 'posttest' ? 'rotate-180' : ''}`} />
@@ -839,8 +886,9 @@ export function ActivityManagementSection() {
                     {expandedSub[lesson.id] === 'posttest' && (
                       <div className="px-6 py-4">
                         <QuestionCRUD
-                          testKey={`lesson_${lesson.id}_posttest`}
+                          testKey={postKey}
                           title={`Post-Test ${lesson.title}`}
+                          onUpdate={refreshOverrides}
                         />
                       </div>
                     )}
@@ -866,7 +914,10 @@ export function ActivityManagementSection() {
             lessonId={editingStage.lessonId}
             stageIndex={editingStage.stageIndex}
             onClose={() => setEditingStage(null)}
-            onSaved={() => forceUpdate(v => v + 1)}
+            onSaved={async () => {
+              await refreshOverrides();
+              forceUpdate(v => v + 1);
+            }}
           />
         );
       })()}

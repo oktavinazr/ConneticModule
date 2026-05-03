@@ -476,10 +476,10 @@ function BoxDropSlot({ slotNum, placedItem, validated, isCorrect, onDrop, onRetu
   boxType: BoxItemType;
 }) {
   const isCourier = boxType === 'courier';
-  const [{ isOver, canDrop }, drop] = useDrop({
+  const [{ isOver, canDrop }, drop] = useDrop<{ id: string; itemType: BoxItemType }, any, { isOver: boolean; canDrop: boolean }>({
     accept: DRAG_TYPE_BOX,
-    canDrop: (d: { id: string; itemType: BoxItemType }) => d.itemType === boxType,
-    drop: (d: { id: string }) => onDrop(slotNum, d.id),
+    canDrop: (d) => d.itemType === boxType,
+    drop: (d) => onDrop(slotNum, d.id),
     collect: m => ({ isOver: m.isOver(), canDrop: m.canDrop() }),
   });
   const isActive = isOver && canDrop;

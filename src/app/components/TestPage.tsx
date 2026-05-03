@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link } from 'react-router';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { Link, useBlocker } from 'react-router';
 import {
   BookOpen,
   ChevronLeft,
@@ -12,6 +12,7 @@ import {
   Info,
   ChevronRight,
   AlertCircle,
+  Lock,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -25,10 +26,11 @@ import {
 } from './ui/alert-dialog';
 import { TestQuestion } from '../data/lessons';
 import { lessons } from '../data/lessons';
-import { getLessonProgress } from '../utils/progress';
+import { clearAssessmentDraft, getAssessmentDraft, getLessonProgress, saveAssessmentDraft } from '../utils/progress';
 import { getCurrentUser } from '../utils/auth';
 import { LessonFlowSidebar } from './LessonFlowSidebar';
 import { Logo } from './layout/Logo';
+import { toast } from 'sonner';
 
 interface TestPageProps {
   title: string;
@@ -73,52 +75,133 @@ export function TestPage({
   durationNote,
   lessonFlow,
 }: TestPageProps) {
-  const [started, setStarted] = useState(!!existingAnswers && existingAnswers.length > 0);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(() => {
-    if (existingAnswers && existingAnswers.length > 0) return existingAnswers;
-    return new Array(questions.length).fill(null);
-  });
-  const [showResults, setShowResults] = useState(initialShowResults || false);
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(
-    duration && !initialShowResults ? duration * 60 : null
-  );
-  const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
+  // User & Storage Logic
+  const user = useMemo(() => getCurrentUser(), []);
+  const storageKey = useMemo(() =>
+    user ? `assessment_save_${user.id}_${title.replace(/\s+/g, '_')}_${lessonFlow?.lessonId || 'global'}` : null
+  , [user, title, lessonFlow?.lessonId]);
 
-  // Data sidebar (saat digunakan di dalam alur pertemuan)
-  const sidebarLesson = lessonFlow?.lessonId ? lessons[lessonFlow.lessonId] : null;
-  const sidebarUser = getCurrentUser();
-  const [sidebarProgress, setSidebarProgress] = useState<import('../utils/progress').LessonProgress | null>(null);
-  const sidebarFullyCompleted = !!(lessonFlow?.pretestCompleted && lessonFlow.allStagesCompleted && lessonFlow.posttestCompleted);
-  const hasSidebar = !!(sidebarLesson && sidebarProgress && lessonFlow?.lessonId);
+  const [started, setStarted] = useState(Boolean(initialShowResults || (existingAnswers && existingAnswers.length > 0)));
+
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<(number | null)[]>(
+    existingAnswers && existingAnswers.length > 0 ? existingAnswers : new Array(questions.length).fill(null)
+  );
+
+  const [showResults, setShowResults] = useState(initialShowResults || false);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(() => {
+    if (duration && !initialShowResults) return duration * 60;
+    return null;
+  });
+  const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
+  const [showBlockerDialog, setShowBlockerDialog] = useState(false);
 
   useEffect(() => {
-    if (lessonFlow?.lessonId && sidebarUser) {
-      getLessonProgress(sidebarUser.id, lessonFlow.lessonId).then(setSidebarProgress as any);
+    if (initialShowResults || (existingAnswers && existingAnswers.length > 0) || !storageKey || !user) return;
+
+    let cancelled = false;
+    getAssessmentDraft(user.id, storageKey).then((draft) => {
+      if (cancelled || !draft || draft.answers.length !== questions.length) return;
+      setAnswers(draft.answers);
+      setStarted(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [existingAnswers, initialShowResults, questions.length, storageKey, user]);
+
+  // Auto-save draft to Supabase
+  useEffect(() => {
+    if (started && !showResults && storageKey && user) {
+      const timer = setTimeout(() => {
+        void saveAssessmentDraft(user.id, storageKey, answers);
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [lessonFlow?.lessonId]);
+  }, [answers, started, showResults, storageKey, user]);
+
+  // Clear remote draft on completion
+  const clearStorage = useCallback(() => {
+    if (storageKey && user) {
+      void clearAssessmentDraft(user.id, storageKey);
+    }
+  }, [storageKey, user]);
+
+  // Navigation Blocker
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      started && !showResults && currentLocation.pathname !== nextLocation.pathname
+  );
+
+  useEffect(() => {
+    if (blocker.state === "blocked") {
+      setShowBlockerDialog(true);
+    }
+  }, [blocker.state]);
+
+  // Browser Exit Warning
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (started && !showResults) {
+        e.preventDefault();
+        e.returnValue = "Pretest/Posttest sedang berlangsung.";
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [started, showResults]);
+
+  // Reset answers array when questions change length (only if not started)
+  useEffect(() => {
+    if (!started && !(existingAnswers && existingAnswers.length > 0)) {
+      setAnswers(new Array(questions.length).fill(null));
+      setCurrentQuestionIndex(0);
+    }
+  }, [questions.length, started, existingAnswers]);
+
+  // Data sidebar memoization and fetch
+  const sidebarLesson = useMemo(() => 
+    lessonFlow?.lessonId ? lessons[lessonFlow.lessonId] : null
+  , [lessonFlow?.lessonId]);
+
+  const [sidebarProgress, setSidebarProgress] = useState<import('../utils/progress').LessonProgress | null>(null);
+  
+  useEffect(() => {
+    if (lessonFlow?.lessonId && user) {
+      getLessonProgress(user.id, lessonFlow.lessonId).then(setSidebarProgress as any);
+    }
+  }, [lessonFlow?.lessonId, user]); // Dependency on memoized user and primitive lessonId
+
+  const sidebarFullyCompleted = !!(lessonFlow?.pretestCompleted && lessonFlow.allStagesCompleted && lessonFlow.posttestCompleted);
+  const hasSidebar = !!(sidebarLesson && sidebarProgress && lessonFlow?.lessonId);
 
   const currentQuestion = questions[currentQuestionIndex];
   const selectedAnswer = answers[currentQuestionIndex];
 
   const handleTimeUp = useCallback(() => {
-    const finalAnswers = answers.map(a => a ?? -1); // Fill unanswered with -1
+    const finalAnswers = answers.slice(0, questions.length).map(a => a ?? -1);
     const score = finalAnswers.filter((ans, idx) => ans === questions[idx].correctAnswer).length;
+    clearStorage();
     onComplete(score, finalAnswers);
     setShowResults(true);
-  }, [answers, questions, onComplete]);
+  }, [answers, questions, onComplete, clearStorage]);
 
+  // Optimized Timer
   useEffect(() => {
     if (started && !showResults && timeRemaining !== null && timeRemaining > 0) {
-      const timer = setInterval(() => {
+      const interval = setInterval(() => {
         setTimeRemaining((prev) => {
-          if (prev === null || prev <= 1) return 0;
+          if (prev === null || prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
           return prev - 1;
         });
       }, 1000);
-      return () => clearInterval(timer);
+      return () => clearInterval(interval);
     }
-  }, [started, showResults, timeRemaining]);
+  }, [started, showResults, timeRemaining === null]); // Only run once when started or showResults changes
 
   useEffect(() => {
     if (started && !showResults && timeRemaining === 0 && duration) {
@@ -139,11 +222,25 @@ export function TestPage({
     setAnswers(newAnswers);
   };
 
+  const answeredCount = answers.filter(a => a !== null).length;
+  const isAllAnswered = answeredCount === questions.length;
+
   const handleNext = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      setShowConfirmSubmit(true);
+      if (!isAllAnswered) {
+        const firstUnanswered = answers.findIndex(a => a === null);
+        if (firstUnanswered !== -1) {
+          setCurrentQuestionIndex(firstUnanswered);
+          toast.error("Mohon selesaikan seluruh soal terlebih dahulu.", {
+            description: "Beberapa nomor soal masih kosong.",
+            duration: 3000,
+          });
+        }
+      } else {
+        setShowConfirmSubmit(true);
+      }
     }
   };
 
@@ -154,8 +251,9 @@ export function TestPage({
   };
 
   const handleConfirmSubmit = () => {
-    const finalAnswers = answers.map(a => a ?? -1);
+    const finalAnswers = answers.slice(0, questions.length).map(a => a ?? -1);
     const score = finalAnswers.filter((ans, idx) => ans === questions[idx].correctAnswer).length;
+    clearStorage();
     onComplete(score, finalAnswers);
     setShowConfirmSubmit(false);
     setShowResults(true);
@@ -165,14 +263,13 @@ export function TestPage({
     setShowConfirmSubmit(false);
   };
 
-  const answeredCount = answers.filter(a => a !== null).length;
   const progress = (answeredCount / questions.length) * 100;
 
   const score =
     existingScore !== undefined
       ? existingScore
-      : answers.filter((ans, idx) => ans === questions[idx].correctAnswer).length;
-  const percentage = Math.round((score / questions.length) * 100);
+      : answers.filter((ans, idx) => idx < questions.length && ans === questions[idx].correctAnswer).length;
+  const percentage = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
 
   const introInstructions =
     instructions.length > 0
@@ -199,12 +296,12 @@ export function TestPage({
       <div className="px-5 py-4 border-b border-[#D5DEEF] bg-[#F8FAFD]">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-xs font-black text-[#395886] uppercase tracking-widest">Navigasi Soal</h3>
-          <span className="text-[10px] font-bold text-[#628ECB] bg-[#628ECB]/10 px-2 py-0.5 rounded-full">
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isAllAnswered ? 'text-[#10B981] bg-[#10B981]/10' : 'text-[#628ECB] bg-[#628ECB]/10'}`}>
             {answeredCount}/{questions.length} Terjawab
           </span>
         </div>
         <div className="h-1 w-full bg-[#D5DEEF] rounded-full overflow-hidden mt-2">
-          <div className="h-full bg-[#628ECB] transition-all duration-500" style={{ width: `${progress}%` }} />
+          <div className={`h-full transition-all duration-500 ${isAllAnswered ? 'bg-[#10B981]' : 'bg-[#628ECB]'}`} style={{ width: `${progress}%` }} />
         </div>
       </div>
       <div className="p-4 overflow-y-auto max-h-[300px] sm:max-h-none">
@@ -221,7 +318,7 @@ export function TestPage({
                     ? 'border-[#628ECB] bg-[#628ECB] text-white shadow-md shadow-[#628ECB]/20' 
                     : isAnswered 
                     ? 'border-[#10B981] bg-[#10B981]/5 text-[#10B981]' 
-                    : 'border-[#D5DEEF] bg-white text-[#395886]/40 hover:border-[#628ECB]/30'}`}
+                    : 'border-red-200 bg-red-50/30 text-red-400 hover:border-[#628ECB]/30'}`}
               >
                 {idx + 1}
               </button>
@@ -230,8 +327,8 @@ export function TestPage({
         </div>
       </div>
       <div className="p-4 bg-[#F8FAFD] border-t border-[#D5DEEF] space-y-2">
-        <div className="flex items-center gap-2 text-[10px] font-bold text-[#395886]/60">
-          <div className="w-2.5 h-2.5 rounded-full bg-[#D5DEEF]" /> Belum dijawab
+        <div className="flex items-center gap-2 text-[10px] font-bold text-red-400">
+          <div className="w-2.5 h-2.5 rounded-full bg-red-200" /> Belum dijawab
         </div>
         <div className="flex items-center gap-2 text-[10px] font-bold text-[#10B981]">
           <div className="w-2.5 h-2.5 rounded-full bg-[#10B981]" /> Sudah dijawab
@@ -261,9 +358,10 @@ export function TestPage({
                 </div>
               </Link>
               <div className="h-8 w-px bg-[#D5DEEF] hidden sm:block" />
-              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-[#628ECB]/10 px-3 py-1 text-xs font-bold text-[#628ECB] uppercase tracking-widest border border-[#628ECB]/20">
-                {title}
-              </span>
+              <div className="hidden sm:flex items-center gap-2 rounded-lg bg-[#628ECB]/10 px-3 py-1 border border-[#628ECB]/20">
+                <CheckCircle className="w-3.5 h-3.5 text-[#628ECB]" />
+                <span className="text-xs font-bold text-[#628ECB] uppercase tracking-widest">Review Mode: {title}</span>
+              </div>
             </div>
             <Link
               to={backPath}
@@ -294,8 +392,9 @@ export function TestPage({
             <div className="bg-gradient-to-br from-[#395886] via-[#4A6FA8] to-[#628ECB] px-8 py-10">
               <div className="flex flex-col md:flex-row items-center gap-8 text-center md:text-left">
                 <div className="relative flex h-32 w-32 shrink-0 items-center justify-center rounded-[2rem] bg-white/10 backdrop-blur-md shadow-2xl ring-1 ring-white/30 flex-col group transition-transform hover:scale-105 duration-500">
-                  <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] mb-1">Nilai Akhir</p>
+                  <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] mb-1">Skor Akhir</p>
                   <span className="text-5xl font-black text-white leading-none tabular-nums">{percentage}</span>
+                  <p className="text-[10px] font-bold text-white/40 mt-1 uppercase tracking-widest">{score}/{questions.length} Benar</p>
                 </div>
                 
                 <div className="flex-1 min-w-0">
@@ -577,16 +676,19 @@ export function TestPage({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex min-h-[76px] items-center justify-between gap-6">
             <div className="flex min-w-0 items-center gap-4">
-              <Link to={backPath} className="flex items-center gap-3">
+              <div className="flex items-center gap-3 opacity-50 cursor-not-allowed">
                 <div className="hidden sm:block min-w-0">
                   <Logo />
                 </div>
                 <div className="sm:hidden">
                   <Logo size="sm" />
                 </div>
-              </Link>
+              </div>
               <div className="h-8 w-px bg-[#D5DEEF] hidden sm:block" />
-              <span className="hidden sm:block text-sm font-bold text-[#628ECB] uppercase tracking-widest">{title}</span>
+              <div className="hidden sm:flex items-center gap-2">
+                <Lock className="w-3.5 h-3.5 text-[#628ECB]" />
+                <span className="text-sm font-bold text-[#628ECB] uppercase tracking-widest">{title} Sedang Berlangsung</span>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               {timeRemaining !== null && (
@@ -623,7 +725,7 @@ export function TestPage({
                     ? 'border-[#628ECB] bg-[#628ECB] text-white' 
                     : isAnswered 
                     ? 'border-[#10B981] bg-[#10B981]/5 text-[#10B981]' 
-                    : 'border-[#D5DEEF] bg-white text-[#395886]/40'}`}
+                    : 'border-red-200 bg-red-50/30 text-red-400'}`}
               >
                 {idx + 1}
               </button>
@@ -721,7 +823,11 @@ export function TestPage({
               
               <button
                 onClick={handleNext}
-                className={`flex items-center gap-2 rounded-xl px-7 py-2.5 text-sm font-bold transition-all shadow-md active:scale-95 bg-[#628ECB] text-white hover:bg-[#395886]`}
+                className={`flex items-center gap-2 rounded-xl px-7 py-2.5 text-sm font-bold transition-all shadow-md active:scale-95 ${
+                  currentQuestionIndex < questions.length - 1 || isAllAnswered
+                    ? 'bg-[#628ECB] text-white hover:bg-[#395886]'
+                    : 'bg-[#D5DEEF] text-[#395886]/40 cursor-not-allowed'
+                }`}
               >
                 {currentQuestionIndex < questions.length - 1 ? (
                   <>Lanjut <ChevronRight className="h-4 w-4" /></>
@@ -734,10 +840,20 @@ export function TestPage({
 
           {/* Progress Indicator for Mobile (at bottom of card) */}
           <div className="lg:hidden mt-6 bg-white rounded-2xl border border-[#D5DEEF] p-4 flex items-center justify-between">
-            <span className="text-xs font-bold text-[#395886]/60">Terjawab: {answeredCount}/{questions.length}</span>
+            <span className={`text-xs font-bold ${isAllAnswered ? 'text-[#10B981]' : 'text-[#395886]/60'}`}>
+              Terjawab: {answeredCount}/{questions.length}
+            </span>
             <button 
-              onClick={() => setShowConfirmSubmit(true)}
-              className="text-xs font-black text-[#628ECB] uppercase tracking-widest hover:underline"
+              onClick={() => {
+                if (isAllAnswered) {
+                  setShowConfirmSubmit(true);
+                } else {
+                  const firstUnanswered = answers.findIndex(a => a === null);
+                  if (firstUnanswered !== -1) setCurrentQuestionIndex(firstUnanswered);
+                  toast.error("Mohon selesaikan seluruh soal.");
+                }
+              }}
+              className={`text-xs font-black uppercase tracking-widest hover:underline ${isAllAnswered ? 'text-[#10B981]' : 'text-[#628ECB]'}`}
             >
               Selesaikan Tes
             </button>
@@ -749,21 +865,49 @@ export function TestPage({
         <AlertDialogContent className="rounded-[2rem] border-[#D5DEEF] shadow-2xl">
           <AlertDialogHeader>
             <div className="flex items-center gap-3 mb-1">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#628ECB]/10 text-[#628ECB]">
-                <AlertCircle className="h-5 w-5" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#10B981]/10 text-[#10B981]">
+                <CheckCircle className="h-5 w-5" />
               </div>
-              <AlertDialogTitle className="text-[#395886] text-xl font-black">Konfirmasi Selesai</AlertDialogTitle>
+              <AlertDialogTitle className="text-[#395886] text-xl font-black">Kumpulkan Jawaban?</AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-[#395886]/65 font-medium text-base leading-relaxed">
-              Apakah Anda yakin sudah selesai mengerjakan? Jawaban tidak dapat diubah setelah dikumpulkan.
+              Apakah Anda yakin seluruh jawaban sudah benar? Setelah dikumpulkan, jawaban Anda akan diproses dan tidak dapat diubah kembali.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-3 mt-2">
             <AlertDialogCancel onClick={handleCancelSubmit} className="border-[#D5DEEF] text-[#395886] hover:bg-[#F0F3FA] rounded-xl font-bold px-6">
-              Tidak, Kembali
+              Periksa Kembali
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSubmit} className="bg-gradient-to-r from-[#395886] to-[#628ECB] text-white hover:from-[#2E4A75] hover:to-[#4A79BA] rounded-xl font-bold px-6 shadow-lg shadow-[#628ECB]/20">
-              Ya, Kumpulkan
+            <AlertDialogAction onClick={handleConfirmSubmit} className="bg-gradient-to-r from-[#10B981] to-[#059669] text-white hover:from-[#059669] hover:to-[#047857] rounded-xl font-bold px-6 shadow-lg shadow-[#10B981]/20">
+              Ya, Selesaikan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Navigation Blocker Dialog */}
+      <AlertDialog open={showBlockerDialog} onOpenChange={setShowBlockerDialog}>
+        <AlertDialogContent className="rounded-[2rem] border-[#D5DEEF] shadow-2xl">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <AlertDialogTitle className="text-red-700 text-xl font-black">Akses Terkunci</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-[#395886]/65 font-medium text-base leading-relaxed">
+              {title} sedang berlangsung. Anda harus menyelesaikan seluruh soal dan mengumpulkannya sebelum dapat keluar atau berpindah halaman.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-2">
+            <AlertDialogAction 
+              onClick={() => {
+                setShowBlockerDialog(false);
+                blocker.reset?.();
+              }} 
+              className="w-full bg-[#395886] text-white hover:bg-[#2A4468] rounded-xl font-bold px-6 shadow-lg"
+            >
+              Lanjutkan Pengerjaan
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

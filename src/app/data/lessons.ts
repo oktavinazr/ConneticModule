@@ -544,7 +544,7 @@ export const lessons: Record<string, Lesson> = {
     id: '1',
     title: 'Pertemuan 1',
     topic: 'Konsep Dasar TCP',
-    description: 'Memahami dasar-dasar Transmission Control Protocol (TCP), komponen TCP Header, dan proses encapsulation/decapsulation',
+    description: 'Materi Konsep Dasar Transmission Control Protocol (TCP), Model Lapisan TCP/IP, dan Proses Transmisi Data (Encapsulation & Decapsulation)',
     objectives: ['X.TCP.1', 'X.TCP.2', 'X.TCP.3', 'X.TCP.4', 'X.TCP.5', 'X.TCP.6', 'X.TCP.7', 'X.TCP.8', 'X.TCP.9', 'X.TCP.10'],
     initialCompetencies: [
       'Peserta didik telah mengenal penggunaan komputer dan internet dalam kehidupan sehari-hari serta memahami secara umum fungsi jaringan komputer',
@@ -600,7 +600,7 @@ export const lessons: Record<string, Lesson> = {
     id: '2',
     title: 'Pertemuan 2',
     topic: 'Mekanisme TCP',
-    description: 'Mendalami mekanisme kerja TCP seperti Three-Way Handshake, Flow Control, dan Congestion Control',
+    description: 'Materi Mekanisme kerja TCP seperti TCP Header, TCP Sequence Number, dan TCP Theree-Way Handshake',
     objectives: ['X.TCP.4', 'X.TCP.5', 'X.TCP.8', 'X.TCP.9', 'X.TCP.10'],
     initialCompetencies: ['Konsep dasar TCP', 'Komponen TCP Header'],
     materials: ['Three-Way Handshake', 'Flow Control (Windowing)', 'Congestion Control'],

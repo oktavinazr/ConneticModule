@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ChevronDown,
   Edit2,
@@ -10,6 +10,7 @@ import {
   getStageOverride,
   hasStageOverride,
   isTestOverridden,
+  loadAllStageOverrides,
 } from '../../utils/adminData';
 import { QuestionCRUD, StageEditModal, CTL_META } from './ActivityManagementSection';
 
@@ -23,7 +24,32 @@ export function EditLearningSection() {
   const [editingStage, setEditingStage] = useState<{ lessonId: string; stageIndex: number } | null>(null);
   const [, forceUpdate] = useState(0);
 
+  const [overrideMap, setOverrideMap] = useState<Record<string, boolean>>({});
+
   const lessonList = Object.values(lessons);
+
+  const refreshOverrides = useCallback(async () => {
+    await loadAllStageOverrides();
+
+    const keys: string[] = [];
+    lessonList.forEach(l => {
+      keys.push(`lesson_${l.id}_pretest`);
+      keys.push(`lesson_${l.id}_posttest`);
+    });
+    // Add global tests too
+    keys.push('global-pretest');
+    keys.push('global-posttest');
+
+    const overrides: Record<string, boolean> = {};
+    await Promise.all(keys.map(async key => {
+      overrides[key] = await isTestOverridden(key);
+    }));
+    setOverrideMap(overrides);
+  }, [lessonList]);
+
+  useEffect(() => {
+    refreshOverrides();
+  }, [refreshOverrides]);
 
   function getLessonTab(lessonId: string): LessonTab {
     return activeLessonTab[lessonId] ?? 'pretest';
@@ -75,8 +101,12 @@ export function EditLearningSection() {
           {lessonList.map(lesson => {
             const isOpen = expandedLesson === lesson.id;
             const modCount = lesson.stages.filter((_, si) => hasStageOverride(lesson.id, si)).length;
-            const preOverride = isTestOverridden(`lesson_${lesson.id}_pretest`);
-            const postOverride = isTestOverridden(`lesson_${lesson.id}_posttest`);
+            
+            const preKey = `lesson_${lesson.id}_pretest`;
+            const postKey = `lesson_${lesson.id}_posttest`;
+            
+            const preOverride = overrideMap[preKey] || false;
+            const postOverride = overrideMap[postKey] || false;
             const totalMod = modCount + (preOverride ? 1 : 0) + (postOverride ? 1 : 0);
             const currentTab = getLessonTab(lesson.id);
 
@@ -258,7 +288,10 @@ export function EditLearningSection() {
             lessonId={editingStage.lessonId}
             stageIndex={editingStage.stageIndex}
             onClose={() => setEditingStage(null)}
-            onSaved={() => forceUpdate(v => v + 1)}
+            onSaved={async () => {
+              await refreshOverrides();
+              forceUpdate(v => v + 1);
+            }}
           />
         );
       })()}

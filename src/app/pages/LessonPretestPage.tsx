@@ -37,16 +37,6 @@ export function LessonPretestPage() {
     loadTestQuestions(`lesson_${lessonId}_pretest`).then(setQuestions);
   }, [user, lesson, lessonId, navigate]);
 
-  useEffect(() => {
-    if (!testActive || progress.pretestCompleted) return;
-    window.history.pushState(null, '', window.location.href);
-    const handlePopState = () => {
-      window.history.pushState(null, '', window.location.href);
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [testActive, progress.pretestCompleted]);
-
   if (!lesson) return null;
 
   if (!unlocked) {
@@ -104,6 +94,11 @@ export function LessonPretestPage() {
     ? progress.answers.pretest
     : undefined;
 
+  const lessonFlow = useState(() => ({
+    step: 2,
+    lessonId: lessonId!,
+  }))[0];
+
   return (
     <TestPage
       title={`Pre-Test ${lesson.title}`}
@@ -118,8 +113,7 @@ export function LessonPretestPage() {
       onStart={() => setTestActive(true)}
       isLessonPretest={true}
       lessonFlow={{
-        step: 2,
-        lessonId: lessonId!,
+        ...lessonFlow,
         pretestCompleted: progress.pretestCompleted,
         allStagesCompleted: progress.completedStages.length === lesson.stages.length,
         posttestCompleted: progress.posttestCompleted,

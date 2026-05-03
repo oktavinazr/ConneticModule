@@ -44,6 +44,7 @@ import {
   X,
 } from 'lucide-react';
 import { useNavigate, Link, useSearchParams } from 'react-router';
+import { addAdminGroupName, assignGroup, deleteAdminGroupName, getAdminGroupNames, getAllGroupAssignments, removeGroup, renameAdminGroupName } from '../utils/groups';
 import { lessons, globalPretest, globalPosttest, type Stage } from '../data/lessons';
 import { getAllStudents, logout, getCurrentUser, resetStudentPassword } from '../utils/auth';
 import { getAllProgress, getGlobalTestProgress, getLessonProgress } from '../utils/progress';
@@ -64,8 +65,6 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type AdminSection = 'dashboard' | 'students' | 'groups' | 'edit-learning' | 'results';
-
-const GROUP_STORAGE_KEY = 'student-groups';
 
 const CHART_COLORS = ['#628ECB', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#6366F1', '#14B8A6'];
 
@@ -674,56 +673,53 @@ export function AdminPage() {
   }, [availableGroups, customGroupNames]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(GROUP_STORAGE_KEY);
-      setGroupAssignmentsAdmin(raw ? JSON.parse(raw) : {});
-    } catch { setGroupAssignmentsAdmin({}); }
-    try {
-      const raw = localStorage.getItem('admin-group-names');
-      setCustomGroupNames(raw ? JSON.parse(raw) : []);
-    } catch { setCustomGroupNames([]); }
+    getAllGroupAssignments().then(setGroupAssignmentsAdmin);
+    getAdminGroupNames().then(setCustomGroupNames);
   }, [section]);
 
-  const saveGroupAssignmentsAdmin = (next: Record<string, string>) => {
-    localStorage.setItem(GROUP_STORAGE_KEY, JSON.stringify(next));
-    setGroupAssignmentsAdmin(next);
+  const assignStudentToGroup = async (studentId: string, groupName: string) => {
+    if (!groupName) {
+      await removeGroup(studentId);
+      setGroupAssignmentsAdmin(prev => { const n = { ...prev }; delete n[studentId]; return n; });
+    } else {
+      await assignGroup(studentId, groupName);
+      setGroupAssignmentsAdmin(prev => ({ ...prev, [studentId]: groupName }));
+    }
   };
 
-  const assignStudentToGroup = (studentId: string, groupName: string) => {
-    const next = { ...groupAssignmentsAdmin };
-    if (!groupName) delete next[studentId];
-    else next[studentId] = groupName;
-    saveGroupAssignmentsAdmin(next);
-  };
-
-  const addGroup = () => {
+  const addGroup = async () => {
     const trimmed = newGroupInput.trim();
     if (!trimmed || allGroupNames.includes(trimmed)) return;
-    const next = [...customGroupNames, trimmed];
-    localStorage.setItem('admin-group-names', JSON.stringify(next));
-    setCustomGroupNames(next);
+    await addAdminGroupName(trimmed);
+    setCustomGroupNames(await getAdminGroupNames());
     setNewGroupInput('');
   };
 
-  const deleteGroup = (groupName: string) => {
+  const deleteGroup = async (groupName: string) => {
     if (!window.confirm(`Hapus kelompok "${groupName}"? Semua anggota akan dipindah ke "Belum Bergabung".`)) return;
-    const next = { ...groupAssignmentsAdmin };
-    Object.keys(next).forEach(id => { if (next[id] === groupName) delete next[id]; });
-    saveGroupAssignmentsAdmin(next);
-    const nextCustom = customGroupNames.filter(n => n !== groupName);
-    localStorage.setItem('admin-group-names', JSON.stringify(nextCustom));
-    setCustomGroupNames(nextCustom);
+    const affected = Object.keys(groupAssignmentsAdmin).filter(id => groupAssignmentsAdmin[id] === groupName);
+    await Promise.all(affected.map(id => removeGroup(id)));
+    setGroupAssignmentsAdmin(prev => {
+      const n = { ...prev };
+      affected.forEach(id => delete n[id]);
+      return n;
+    });
+    await deleteAdminGroupName(groupName);
+    setCustomGroupNames(await getAdminGroupNames());
   };
 
-  const confirmRenameGroup = (oldName: string) => {
+  const confirmRenameGroup = async (oldName: string) => {
     const trimmed = renameInput.trim();
     if (!trimmed || (trimmed !== oldName && allGroupNames.includes(trimmed))) return;
-    const next = { ...groupAssignmentsAdmin };
-    Object.keys(next).forEach(id => { if (next[id] === oldName) next[id] = trimmed; });
-    saveGroupAssignmentsAdmin(next);
-    const nextCustom = customGroupNames.map(n => n === oldName ? trimmed : n);
-    localStorage.setItem('admin-group-names', JSON.stringify(nextCustom));
-    setCustomGroupNames(nextCustom);
+    const affected = Object.keys(groupAssignmentsAdmin).filter(id => groupAssignmentsAdmin[id] === oldName);
+    await Promise.all(affected.map(id => assignGroup(id, trimmed)));
+    setGroupAssignmentsAdmin(prev => {
+      const n = { ...prev };
+      affected.forEach(id => { n[id] = trimmed; });
+      return n;
+    });
+    await renameAdminGroupName(oldName, trimmed);
+    setCustomGroupNames(await getAdminGroupNames());
     setRenamingGroup(null);
   };
 
@@ -1846,14 +1842,14 @@ export function AdminPage() {
                               {s.lessons.map(l => {
                                 const ld = lessons[l.lessonId];
                                 return (
-                                  <>
-                                    <td key={`${l.lessonId}-pre`} className="px-3 py-3 text-center border-l border-[#D5DEEF]/50">
+                                  <React.Fragment key={l.lessonId}>
+                                    <td className="px-3 py-3 text-center border-l border-[#D5DEEF]/50">
                                       <ScoreBadge score={l.pretest} total={ld?.pretest.questions.length ?? 0} completed={l.pretestCompleted} />
                                     </td>
-                                    <td key={`${l.lessonId}-post`} className="px-3 py-3 text-center">
+                                    <td className="px-3 py-3 text-center">
                                       <ScoreBadge score={l.posttest} total={ld?.posttest.questions.length ?? 0} completed={l.posttestCompleted} />
                                     </td>
-                                  </>
+                                  </React.Fragment>
                                 );
                               })}
                               <td className="px-4 py-3 text-center">

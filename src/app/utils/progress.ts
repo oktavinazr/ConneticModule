@@ -24,80 +24,25 @@ export interface GlobalTestProgress {
   globalPosttestAnswers?: number[];
 }
 
-const LOCAL_LESSON_PROGRESS_KEY = 'connetic_lesson_progress';
-const LOCAL_GLOBAL_PROGRESS_KEY = 'connetic_global_test_progress';
+export interface AssessmentDraft {
+  userId: string;
+  draftKey: string;
+  answers: Array<number | null>;
+  updatedAt?: string;
+}
 
 const progressCache = new Map<string, LessonProgress>();
+const globalProgressCache = new Map<string, GlobalTestProgress>();
+const assessmentDraftCache = new Map<string, AssessmentDraft>();
+
 const cacheKey = (userId: string, lessonId: string) => `${userId}:${lessonId}`;
+const draftCacheKey = (userId: string, draftKey: string) => `${userId}:${draftKey}`;
 
 const isPlainObject = (value: unknown): value is Record<string, any> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-
-const shouldUseLocalProgressStore = (userId: string) => !isUuid(userId);
-
-const canUseLocalProgressFallback = (error: unknown): boolean => {
-  if (!error || typeof error !== 'object') return false;
-
-  const candidate = error as {
-    code?: string;
-    details?: string;
-    hint?: string;
-    message?: string;
-    status?: number;
-  };
-
-  const message = [
-    candidate.message ?? '',
-    candidate.details ?? '',
-    candidate.hint ?? '',
-  ]
-    .join(' ')
-    .toLowerCase();
-
-  return (
-    candidate.code === '22P02' ||
-    candidate.code === '42501' ||
-    candidate.status === 400 ||
-    candidate.status === 401 ||
-    candidate.status === 403 ||
-    candidate.status === 404 ||
-    message.includes('invalid input syntax for type uuid') ||
-    message.includes('row-level security') ||
-    message.includes('permission denied') ||
-    message.includes('failed to fetch') ||
-    message.includes('network') ||
-    message.includes('does not exist') ||
-    message.includes('relation')
-  );
-};
-
-const readStorageRecord = <T extends Record<string, any>>(storageKey: string): T => {
-  try {
-    if (typeof window === 'undefined' || !window.localStorage) {
-      return {} as T;
-    }
-
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return {} as T;
-
-    const parsed = JSON.parse(raw);
-    return isPlainObject(parsed) ? (parsed as T) : ({} as T);
-  } catch {
-    return {} as T;
-  }
-};
-
-const writeStorageRecord = (storageKey: string, value: Record<string, any>) => {
-  try {
-    if (typeof window === 'undefined' || !window.localStorage) return;
-    window.localStorage.setItem(storageKey, JSON.stringify(value));
-  } catch {
-    // Ignore local storage write failures and keep the in-memory cache working.
-  }
-};
 
 const normalizeCompletedStages = (value: unknown): number[] =>
   Array.from(
@@ -110,7 +55,6 @@ const normalizeCompletedStages = (value: unknown): number[] =>
 
 const normalizeStageAttempts = (value: unknown): Record<string, number> => {
   if (!isPlainObject(value)) return {};
-
   return Object.fromEntries(
     Object.entries(value)
       .map(([key, item]) => [key, Number(item)] as const)
@@ -120,7 +64,6 @@ const normalizeStageAttempts = (value: unknown): Record<string, number> => {
 
 const normalizeStageSuccess = (value: unknown): Record<string, boolean> => {
   if (!isPlainObject(value)) return {};
-
   return Object.fromEntries(
     Object.entries(value).map(([key, item]) => [key, Boolean(item)]),
   );
@@ -131,9 +74,12 @@ const normalizeAnswers = (value: unknown): Record<string, any> =>
 
 const normalizeNumberArray = (value: unknown): number[] =>
   Array.isArray(value)
-    ? value
-        .map((item) => Number(item))
-        .filter((item) => Number.isFinite(item))
+    ? value.map((item) => Number(item)).filter((item) => Number.isFinite(item))
+    : [];
+
+const normalizeDraftAnswers = (value: unknown): Array<number | null> =>
+  Array.isArray(value)
+    ? value.map((item) => (item === null ? null : Number(item))).map((item) => (typeof item === 'number' && Number.isFinite(item) ? item : null))
     : [];
 
 const createDefaultLessonProgress = (userId: string, lessonId: string): LessonProgress => ({
@@ -155,18 +101,23 @@ const createDefaultGlobalTestProgress = (userId: string): GlobalTestProgress => 
   globalPosttestAnswers: [],
 });
 
-const cloneLessonProgress = (progress: LessonProgress): LessonProgress => ({
-  ...progress,
-  completedStages: [...progress.completedStages],
-  answers: { ...progress.answers },
-  stageAttempts: { ...progress.stageAttempts },
-  stageSuccess: { ...progress.stageSuccess },
+const cloneLessonProgress = (p: LessonProgress): LessonProgress => ({
+  ...p,
+  completedStages: [...p.completedStages],
+  answers: { ...p.answers },
+  stageAttempts: { ...p.stageAttempts },
+  stageSuccess: { ...p.stageSuccess },
 });
 
-const cloneGlobalTestProgress = (progress: GlobalTestProgress): GlobalTestProgress => ({
-  ...progress,
-  globalPretestAnswers: [...(progress.globalPretestAnswers ?? [])],
-  globalPosttestAnswers: [...(progress.globalPosttestAnswers ?? [])],
+const cloneGlobalTestProgress = (p: GlobalTestProgress): GlobalTestProgress => ({
+  ...p,
+  globalPretestAnswers: [...(p.globalPretestAnswers ?? [])],
+  globalPosttestAnswers: [...(p.globalPosttestAnswers ?? [])],
+});
+
+const cloneAssessmentDraft = (draft: AssessmentDraft): AssessmentDraft => ({
+  ...draft,
+  answers: [...draft.answers],
 });
 
 const normalizeLessonProgress = (
@@ -176,21 +127,16 @@ const normalizeLessonProgress = (
 ): LessonProgress => {
   const defaults = createDefaultLessonProgress(userId, lessonId);
   if (!raw) return defaults;
-
   return {
     lessonId,
     userId,
     pretestCompleted: Boolean(raw.pretest_completed ?? raw.pretestCompleted),
     pretestScore: raw.pretest_score ?? raw.pretestScore,
-    completedStages: normalizeCompletedStages(
-      raw.completed_stages ?? raw.completedStages,
-    ),
+    completedStages: normalizeCompletedStages(raw.completed_stages ?? raw.completedStages),
     posttestCompleted: Boolean(raw.posttest_completed ?? raw.posttestCompleted),
     posttestScore: raw.posttest_score ?? raw.posttestScore,
     answers: normalizeAnswers(raw.answers),
-    stageAttempts: normalizeStageAttempts(
-      raw.stage_attempts ?? raw.stageAttempts,
-    ),
+    stageAttempts: normalizeStageAttempts(raw.stage_attempts ?? raw.stageAttempts),
     stageSuccess: normalizeStageSuccess(raw.stage_success ?? raw.stageSuccess),
   };
 };
@@ -199,71 +145,44 @@ const normalizeGlobalTestProgress = (
   raw: Record<string, any> | null | undefined,
   userId: string,
 ): GlobalTestProgress => {
-  const defaults = createDefaultGlobalTestProgress(userId);
-  if (!raw) return defaults;
-
+  if (!raw) return createDefaultGlobalTestProgress(userId);
   return {
     userId,
-    globalPretestCompleted: Boolean(
-      raw.global_pretest_completed ?? raw.globalPretestCompleted,
-    ),
+    globalPretestCompleted: Boolean(raw.global_pretest_completed ?? raw.globalPretestCompleted),
     globalPretestScore: raw.global_pretest_score ?? raw.globalPretestScore,
-    globalPretestAnswers: normalizeNumberArray(
-      raw.global_pretest_answers ?? raw.globalPretestAnswers,
-    ),
-    globalPosttestCompleted: Boolean(
-      raw.global_posttest_completed ?? raw.globalPosttestCompleted,
-    ),
+    globalPretestAnswers: normalizeNumberArray(raw.global_pretest_answers ?? raw.globalPretestAnswers),
+    globalPosttestCompleted: Boolean(raw.global_posttest_completed ?? raw.globalPosttestCompleted),
     globalPosttestScore: raw.global_posttest_score ?? raw.globalPosttestScore,
-    globalPosttestAnswers: normalizeNumberArray(
-      raw.global_posttest_answers ?? raw.globalPosttestAnswers,
-    ),
+    globalPosttestAnswers: normalizeNumberArray(raw.global_posttest_answers ?? raw.globalPosttestAnswers),
   };
 };
 
-const getLocalLessonProgress = (
-  userId: string,
-  lessonId: string,
-): LessonProgress | null => {
-  const stored = readStorageRecord<Record<string, LessonProgress>>(
-    LOCAL_LESSON_PROGRESS_KEY,
-  );
-  const raw = stored[cacheKey(userId, lessonId)];
-  return raw ? normalizeLessonProgress(raw, userId, lessonId) : null;
-};
+export const getGlobalTestProgress = async (userId: string): Promise<GlobalTestProgress> => {
+  const cached = globalProgressCache.get(userId);
+  if (cached) return cloneGlobalTestProgress(cached);
 
-const saveLocalLessonProgress = (progress: LessonProgress) => {
-  const stored = readStorageRecord<Record<string, LessonProgress>>(
-    LOCAL_LESSON_PROGRESS_KEY,
-  );
-  stored[cacheKey(progress.userId, progress.lessonId)] = cloneLessonProgress(
-    progress,
-  );
-  writeStorageRecord(LOCAL_LESSON_PROGRESS_KEY, stored);
-};
+  if (!isUuid(userId)) return createDefaultGlobalTestProgress(userId);
 
-const getLocalGlobalTestProgress = (userId: string): GlobalTestProgress | null => {
-  const stored = readStorageRecord<Record<string, GlobalTestProgress>>(
-    LOCAL_GLOBAL_PROGRESS_KEY,
-  );
-  const raw = stored[userId];
-  return raw ? normalizeGlobalTestProgress(raw, userId) : null;
-};
+  const { data, error } = await supabase
+    .from('global_test_progress')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
 
-const saveLocalGlobalTestProgress = (progress: GlobalTestProgress) => {
-  const stored = readStorageRecord<Record<string, GlobalTestProgress>>(
-    LOCAL_GLOBAL_PROGRESS_KEY,
-  );
-  stored[progress.userId] = cloneGlobalTestProgress(progress);
-  writeStorageRecord(LOCAL_GLOBAL_PROGRESS_KEY, stored);
+  if (error) {
+    console.error('[getGlobalTestProgress]', error.message);
+    return createDefaultGlobalTestProgress(userId);
+  }
+
+  const result = normalizeGlobalTestProgress(data, userId);
+  globalProgressCache.set(userId, cloneGlobalTestProgress(result));
+  return cloneGlobalTestProgress(result);
 };
 
 const upsertGlobalTestProgress = async (progress: GlobalTestProgress) => {
-  saveLocalGlobalTestProgress(progress);
+  globalProgressCache.set(progress.userId, cloneGlobalTestProgress(progress));
 
-  if (shouldUseLocalProgressStore(progress.userId)) {
-    return;
-  }
+  if (!isUuid(progress.userId)) return;
 
   const payload = {
     user_id: progress.userId,
@@ -280,16 +199,10 @@ const upsertGlobalTestProgress = async (progress: GlobalTestProgress) => {
     .from('global_test_progress')
     .upsert(payload, { onConflict: 'user_id' });
 
-  if (error && !canUseLocalProgressFallback(error)) {
-    console.error('[upsertGlobalTestProgress] error:', error);
-  }
+  if (error) console.error('[upsertGlobalTestProgress]', error.message);
 };
 
-export const saveGlobalPretestResult = async (
-  userId: string,
-  score: number,
-  answers: any[],
-) => {
+export const saveGlobalPretestResult = async (userId: string, score: number, answers: any[]) => {
   const progress = await getGlobalTestProgress(userId);
   progress.globalPretestCompleted = true;
   progress.globalPretestScore = score;
@@ -297,11 +210,7 @@ export const saveGlobalPretestResult = async (
   await upsertGlobalTestProgress(progress);
 };
 
-export const saveGlobalPosttestResult = async (
-  userId: string,
-  score: number,
-  answers: any[],
-) => {
+export const saveGlobalPosttestResult = async (userId: string, score: number, answers: any[]) => {
   const progress = await getGlobalTestProgress(userId);
   progress.globalPosttestCompleted = true;
   progress.globalPosttestScore = score;
@@ -309,64 +218,17 @@ export const saveGlobalPosttestResult = async (
   await upsertGlobalTestProgress(progress);
 };
 
-export const getGlobalTestProgress = async (
-  userId: string,
-): Promise<GlobalTestProgress> => {
-  const localProgress =
-    getLocalGlobalTestProgress(userId) ?? createDefaultGlobalTestProgress(userId);
-
-  if (shouldUseLocalProgressStore(userId)) {
-    return cloneGlobalTestProgress(localProgress);
-  }
-
-  const { data, error } = await supabase
-    .from('global_test_progress')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (error) {
-    if (canUseLocalProgressFallback(error)) {
-      return cloneGlobalTestProgress(localProgress);
-    }
-
-    console.error('[getGlobalTestProgress] read error:', error);
-    return cloneGlobalTestProgress(createDefaultGlobalTestProgress(userId));
-  }
-
-  if (!data) {
-    return cloneGlobalTestProgress(localProgress);
-  }
-
-  const result = normalizeGlobalTestProgress(data, userId);
-  saveLocalGlobalTestProgress(result);
-  return cloneGlobalTestProgress(result);
-};
-
-export const getCachedProgress = (
-  userId: string,
-  lessonId: string,
-): LessonProgress | null => {
+export const getCachedProgress = (userId: string, lessonId: string): LessonProgress | null => {
   const cached = progressCache.get(cacheKey(userId, lessonId));
   return cached ? cloneLessonProgress(cached) : null;
 };
 
-export const getLessonProgress = async (
-  userId: string,
-  lessonId: string,
-): Promise<LessonProgress> => {
+export const getLessonProgress = async (userId: string, lessonId: string): Promise<LessonProgress> => {
   const key = cacheKey(userId, lessonId);
   const cached = progressCache.get(key);
   if (cached) return cloneLessonProgress(cached);
 
-  const localProgress =
-    getLocalLessonProgress(userId, lessonId) ??
-    createDefaultLessonProgress(userId, lessonId);
-
-  if (shouldUseLocalProgressStore(userId)) {
-    progressCache.set(key, cloneLessonProgress(localProgress));
-    return cloneLessonProgress(localProgress);
-  }
+  if (!isUuid(userId)) return createDefaultLessonProgress(userId, lessonId);
 
   const { data, error } = await supabase
     .from('lesson_progress')
@@ -376,36 +238,20 @@ export const getLessonProgress = async (
     .maybeSingle();
 
   if (error) {
-    if (canUseLocalProgressFallback(error)) {
-      progressCache.set(key, cloneLessonProgress(localProgress));
-      return cloneLessonProgress(localProgress);
-    }
-
-    console.error('[getLessonProgress] read error:', error);
-    const defaults = createDefaultLessonProgress(userId, lessonId);
-    progressCache.set(key, cloneLessonProgress(defaults));
-    return cloneLessonProgress(defaults);
-  }
-
-  if (!data) {
-    progressCache.set(key, cloneLessonProgress(localProgress));
-    return cloneLessonProgress(localProgress);
+    console.error('[getLessonProgress]', error.message);
+    return createDefaultLessonProgress(userId, lessonId);
   }
 
   const result = normalizeLessonProgress(data, userId, lessonId);
-  saveLocalLessonProgress(result);
   progressCache.set(key, cloneLessonProgress(result));
   return cloneLessonProgress(result);
 };
 
 const upsertLessonProgress = async (progress: LessonProgress) => {
-  const nextProgress = cloneLessonProgress(progress);
-  progressCache.set(cacheKey(progress.userId, progress.lessonId), nextProgress);
-  saveLocalLessonProgress(nextProgress);
+  const key = cacheKey(progress.userId, progress.lessonId);
+  progressCache.set(key, cloneLessonProgress(progress));
 
-  if (shouldUseLocalProgressStore(progress.userId)) {
-    return;
-  }
+  if (!isUuid(progress.userId)) return;
 
   const payload = {
     user_id: progress.userId,
@@ -425,28 +271,12 @@ const upsertLessonProgress = async (progress: LessonProgress) => {
     .from('lesson_progress')
     .upsert(payload, { onConflict: 'user_id,lesson_id' });
 
-  if (error && !canUseLocalProgressFallback(error)) {
-    console.error('[upsertLessonProgress] error:', error);
-  }
+  if (error) console.error('[upsertLessonProgress]', error.message);
 };
 
 export const savePretestResult = async (
-  userId: string,
-  lessonId: string,
-  score: number,
-  answers: any[],
+  userId: string, lessonId: string, score: number, answers: any[],
 ) => {
-  const key = cacheKey(userId, lessonId);
-  const current =
-    progressCache.get(key) ?? createDefaultLessonProgress(userId, lessonId);
-
-  progressCache.set(key, {
-    ...current,
-    pretestCompleted: true,
-    pretestScore: score,
-    answers: { ...current.answers, pretest: answers },
-  });
-
   const progress = await getLessonProgress(userId, lessonId);
   progress.pretestCompleted = true;
   progress.pretestScore = score;
@@ -455,10 +285,7 @@ export const savePretestResult = async (
 };
 
 export const savePosttestResult = async (
-  userId: string,
-  lessonId: string,
-  score: number,
-  answers: any[],
+  userId: string, lessonId: string, score: number, answers: any[],
 ) => {
   const progress = await getLessonProgress(userId, lessonId);
   progress.posttestCompleted = true;
@@ -468,9 +295,7 @@ export const savePosttestResult = async (
 };
 
 export const saveReflectionResult = async (
-  userId: string,
-  lessonId: string,
-  reflectionData: any,
+  userId: string, lessonId: string, reflectionData: any,
 ) => {
   const progress = await getLessonProgress(userId, lessonId);
   progress.answers.main_reflection = reflectionData;
@@ -478,35 +303,25 @@ export const saveReflectionResult = async (
 };
 
 export const saveStageAttempt = async (
-  userId: string,
-  lessonId: string,
-  stageIndex: number,
-  isCorrect: boolean,
-  attemptKey?: string,
+  userId: string, lessonId: string, stageIndex: number,
+  isCorrect: boolean, attemptKey?: string,
 ): Promise<number> => {
   const progress = await getLessonProgress(userId, lessonId);
   const stageKey = attemptKey ?? `stage_${stageIndex}`;
-
   progress.stageAttempts[stageKey] = (progress.stageAttempts[stageKey] || 0) + 1;
   if (isCorrect) progress.stageSuccess[stageKey] = true;
-
   await upsertLessonProgress(progress);
   return progress.stageAttempts[stageKey];
 };
 
 export const saveStageProgress = async (
-  userId: string,
-  lessonId: string,
-  stageIndex: number,
-  answer: any,
+  userId: string, lessonId: string, stageIndex: number, answer: any,
 ) => {
   const progress = await getLessonProgress(userId, lessonId);
   const indexNum = Number(stageIndex);
-
   if (!progress.completedStages.includes(indexNum)) {
     progress.completedStages.push(indexNum);
   }
-
   progress.answers[`stage_${indexNum}`] = answer;
   await upsertLessonProgress(progress);
 };
@@ -516,10 +331,7 @@ export const getAllProgress = async (userId: string): Promise<LessonProgress[]> 
   return Promise.all(lessonIds.map((lessonId) => getLessonProgress(userId, lessonId)));
 };
 
-export const isLessonUnlocked = async (
-  userId: string,
-  lessonId: string,
-): Promise<boolean> => {
+export const isLessonUnlocked = async (userId: string, lessonId: string): Promise<boolean> => {
   const globalTest = await getGlobalTestProgress(userId);
   if (!globalTest.globalPretestCompleted) return false;
   if (lessonId === '1') return true;
@@ -536,22 +348,90 @@ export const isLessonUnlocked = async (
   );
 };
 
-export const isGlobalPosttestUnlocked = async (
-  userId: string,
-): Promise<boolean> => {
+export const isGlobalPosttestUnlocked = async (userId: string): Promise<boolean> => {
   const allProgress = await getAllProgress(userId);
   const lessonIds = Object.keys(lessons);
-
   if (allProgress.length < lessonIds.length) return false;
-
   return allProgress.every((progress) => {
     const lesson = lessons[progress.lessonId];
     if (!lesson) return true;
-
     return (
       progress.pretestCompleted &&
       progress.completedStages.length >= lesson.stages.length &&
       progress.posttestCompleted
     );
   });
+};
+
+export const getAssessmentDraft = async (userId: string, draftKey: string): Promise<AssessmentDraft | null> => {
+  const key = draftCacheKey(userId, draftKey);
+  const cached = assessmentDraftCache.get(key);
+  if (cached) return cloneAssessmentDraft(cached);
+
+  if (!isUuid(userId)) return null;
+
+  const { data, error } = await supabase
+    .from('assessment_drafts')
+    .select('user_id, draft_key, answers, updated_at')
+    .eq('user_id', userId)
+    .eq('draft_key', draftKey)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[getAssessmentDraft]', error.message);
+    return null;
+  }
+
+  if (!data) return null;
+
+  const draft: AssessmentDraft = {
+    userId,
+    draftKey,
+    answers: normalizeDraftAnswers(data.answers),
+    updatedAt: data.updated_at,
+  };
+
+  assessmentDraftCache.set(key, cloneAssessmentDraft(draft));
+  return cloneAssessmentDraft(draft);
+};
+
+export const saveAssessmentDraft = async (userId: string, draftKey: string, answers: Array<number | null>) => {
+  if (!isUuid(userId)) return;
+
+  const draft: AssessmentDraft = {
+    userId,
+    draftKey,
+    answers: [...answers],
+    updatedAt: new Date().toISOString(),
+  };
+
+  assessmentDraftCache.set(draftCacheKey(userId, draftKey), cloneAssessmentDraft(draft));
+
+  const { error } = await supabase
+    .from('assessment_drafts')
+    .upsert(
+      {
+        user_id: userId,
+        draft_key: draftKey,
+        answers,
+        updated_at: draft.updatedAt,
+      },
+      { onConflict: 'user_id,draft_key' },
+    );
+
+  if (error) console.error('[saveAssessmentDraft]', error.message);
+};
+
+export const clearAssessmentDraft = async (userId: string, draftKey: string) => {
+  assessmentDraftCache.delete(draftCacheKey(userId, draftKey));
+
+  if (!isUuid(userId)) return;
+
+  const { error } = await supabase
+    .from('assessment_drafts')
+    .delete()
+    .eq('user_id', userId)
+    .eq('draft_key', draftKey);
+
+  if (error) console.error('[clearAssessmentDraft]', error.message);
 };

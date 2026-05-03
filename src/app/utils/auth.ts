@@ -13,11 +13,6 @@ export interface User {
   registeredAt?: string;
 }
 
-interface StoredUser extends User {
-  password: string; // Sekarang ini akan menyimpan Hash, bukan teks asli
-  registeredAt: string;
-}
-
 const ADMIN_CREDENTIALS = {
   id: 'admin-root',
   username: 'admin',
@@ -31,7 +26,6 @@ const ADMIN_CREDENTIALS = {
 };
 
 const CURRENT_USER_KEY = 'currentUser';
-const LOCAL_USERS_KEY = 'connetic_local_users';
 
 // ==========================================
 // FUNGSI BANTUAN UNTUK HASHING PASSWORD
@@ -52,109 +46,8 @@ const hashPassword = async (password: string): Promise<string> => {
 };
 // ==========================================
 
-const getLocalUsers = (): StoredUser[] => {
-  try {
-    const raw = localStorage.getItem(LOCAL_USERS_KEY);
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const setLocalUsers = (users: StoredUser[]) => {
-  localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
-};
-
-const toUser = (storedUser: StoredUser): User => ({
-  id: storedUser.id,
-  name: storedUser.name,
-  username: storedUser.username,
-  email: storedUser.email,
-  gender: storedUser.gender,
-  class: storedUser.class,
-  nis: storedUser.nis,
-  role: storedUser.role,
-  registeredAt: storedUser.registeredAt,
-});
-
 const persistCurrentUser = (user: User) => {
   localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-};
-
-const createLocalUserId = () =>
-  globalThis.crypto?.randomUUID?.() ?? `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
-const canUseLocalFallback = (error: unknown): boolean => {
-  if (!error || typeof error !== 'object') return false;
-
-  const candidate = error as { code?: string; message?: string; status?: number };
-  const message = candidate.message?.toLowerCase() ?? '';
-
-  return (
-    candidate.code === '42501' ||
-    candidate.status === 401 ||
-    candidate.status === 403 ||
-    message.includes('unauthorized') ||
-    message.includes('row-level security') ||
-    message.includes('permission denied') ||
-    message.includes('failed to fetch') ||
-    message.includes('network')
-  );
-};
-
-const findLocalUserByIdentifier = (normalizedIdentifier: string): StoredUser | undefined =>
-  getLocalUsers().find(
-    (user) =>
-      user.email === normalizedIdentifier ||
-      user.username === normalizedIdentifier ||
-      user.nis === normalizedIdentifier
-  );
-
-const hasLocalConflict = (
-  users: StoredUser[],
-  normalizedEmail: string,
-  normalizedUsername: string,
-  normalizedNis: string,
-  excludeUserId?: string
-) =>
-  users.some(
-    (user) =>
-      user.id !== excludeUserId &&
-      (user.email === normalizedEmail || user.username === normalizedUsername || user.nis === normalizedNis)
-  );
-
-const registerLocally = (
-  name: string,
-  normalizedUsername: string,
-  normalizedEmail: string,
-  hashedPassword: string, // <-- Terima password yang sudah di-hash
-  gender: 'Laki-laki' | 'Perempuan',
-  classRoom: string,
-  normalizedNis: string
-): boolean => {
-  const localUsers = getLocalUsers();
-  if (hasLocalConflict(localUsers, normalizedEmail, normalizedUsername, normalizedNis)) {
-    return false;
-  }
-
-  const registeredAt = new Date().toISOString();
-  localUsers.push({
-    id: createLocalUserId(),
-    name: name.trim(),
-    username: normalizedUsername,
-    email: normalizedEmail,
-    password: hashedPassword, // <-- Simpan hash
-    gender,
-    class: classRoom.trim(),
-    nis: normalizedNis,
-    role: 'student',
-    registeredAt,
-  });
-  setLocalUsers(localUsers);
-  return true;
 };
 
 export const register = async (
@@ -171,7 +64,6 @@ export const register = async (
   const normalizedNis = nis.trim();
 
   try {
-    // 1. Hash password sebelum melakukan apapun
     const hashedPassword = await hashPassword(password);
 
     const { data: existing, error: checkError } = await supabase
@@ -179,12 +71,7 @@ export const register = async (
       .select('id')
       .or(`email.eq.${normalizedEmail},username.eq.${normalizedUsername},nis.eq.${normalizedNis}`);
 
-    if (checkError) {
-      if (canUseLocalFallback(checkError)) {
-        return registerLocally(name, normalizedUsername, normalizedEmail, hashedPassword, gender, classRoom, normalizedNis);
-      }
-      throw checkError;
-    }
+    if (checkError) throw checkError;
 
     if (existing && existing.length > 0) {
       return false;
@@ -202,23 +89,11 @@ export const register = async (
       registered_at: new Date().toISOString(),
     }]);
 
-    if (error) {
-      if (canUseLocalFallback(error)) {
-        return registerLocally(name, normalizedUsername, normalizedEmail, hashedPassword, gender, classRoom, normalizedNis);
-      }
-      throw error;
-    }
+    if (error) throw error;
 
     return true;
   } catch (err) {
     console.error('Registration error:', err);
-    if (canUseLocalFallback(err)) {
-      // Pastikan error fallback juga menggunakan hashed password
-      hashPassword(password).then(hPass => 
-        registerLocally(name, normalizedUsername, normalizedEmail, hPass, gender, classRoom, normalizedNis)
-      );
-      return true; // Asumsi berhasil masuk local
-    }
     throw err;
   }
 };
@@ -249,31 +124,17 @@ export const login = async (identifier: string, password: string): Promise<User 
   // Hash password inputan user untuk dibandingkan
   const hashedPassword = await hashPassword(password);
 
-  // Cek Local Storage (Bandingkan hash dengan hash)
-  const localUser = findLocalUserByIdentifier(normalizedIdentifier);
-  if (localUser && localUser.password === hashedPassword) {
-    const user = toUser(localUser);
-    persistCurrentUser(user);
-    return user;
-  }
-
   try {
-    // Cek Database Supabase
     const { data, error } = await supabase
       .from('users')
       .select('*')
       .or(`email.eq.${normalizedIdentifier},username.eq.${normalizedIdentifier},nis.eq.${normalizedIdentifier}`)
       .maybeSingle();
 
-    if (error) {
-      if (canUseLocalFallback(error)) {
-        return null;
-      }
-      console.error('Supabase query error:', error);
-      throw error;
-    }
+    if (error) throw error;
     
-    // Cek password: support data lama (plain text) dan baru (SHA-256 hash)
+    if (!data) return null;
+
     const passwordMatch = data.password === hashedPassword || data.password === password;
     if (!data || !passwordMatch) {
       return null;
@@ -294,9 +155,6 @@ export const login = async (identifier: string, password: string): Promise<User 
     persistCurrentUser(user);
     return user;
   } catch (err) {
-    if (canUseLocalFallback(err)) {
-      return null;
-    }
     console.error('Unexpected login error:', err);
     throw err;
   }
@@ -338,28 +196,6 @@ export const updateUser = async (
   if (updates.nis) dbUpdates.nis = updates.nis.trim();
   if (updates.groupName !== undefined) dbUpdates.group_name = updates.groupName;
 
-  const localUsers = getLocalUsers();
-  const localIndex = localUsers.findIndex((user) => user.id === userId);
-
-  if (localIndex >= 0) {
-    const normalizedEmail = typeof dbUpdates.email === 'string' ? dbUpdates.email : localUsers[localIndex].email;
-    const normalizedUsername = typeof dbUpdates.username === 'string' ? dbUpdates.username : localUsers[localIndex].username;
-    const normalizedNis = typeof dbUpdates.nis === 'string' ? dbUpdates.nis : localUsers[localIndex].nis;
-
-    if (hasLocalConflict(localUsers, normalizedEmail, normalizedUsername, normalizedNis, userId)) {
-      return false;
-    }
-
-    localUsers[localIndex] = { ...localUsers[localIndex], ...updates, ...dbUpdates };
-    setLocalUsers(localUsers);
-
-    const currentUser = getCurrentUser();
-    if (currentUser && currentUser.id === userId) {
-      persistCurrentUser({ ...currentUser, ...updates, ...dbUpdates } as User);
-    }
-    return true;
-  }
-
   const { data, error } = await supabase
     .from('users')
     .update(dbUpdates)
@@ -385,18 +221,14 @@ export const updateUser = async (
 };
 
 export const getAllStudents = async (): Promise<User[]> => {
-  const localStudents = getLocalUsers()
-    .filter((user) => user.role === 'student')
-    .map(toUser);
-
   const { data, error } = await supabase
     .from('users')
     .select('id, name, username, email, gender, class, nis, role, group_name, registered_at')
     .eq('role', 'student');
 
-  if (error || !data) return localStudents;
+  if (error || !data) return [];
 
-  const remoteStudents: User[] = data.map((u) => ({
+  return data.map((u) => ({
     id: u.id,
     name: u.name,
     username: u.username,
@@ -408,18 +240,6 @@ export const getAllStudents = async (): Promise<User[]> => {
     groupName: u.group_name,
     registeredAt: u.registered_at,
   }));
-
-  const seen = new Set(remoteStudents.map((user) => `${user.email}|${user.username}|${user.nis}`));
-  const mergedStudents: User[] = [...remoteStudents];
-
-  for (const localStudent of localStudents) {
-    const key = `${localStudent.email}|${localStudent.username}|${localStudent.nis}`;
-    if (!seen.has(key)) {
-      mergedStudents.push(localStudent);
-    }
-  }
-
-  return mergedStudents;
 };
 
 export const isAdminUser = (user: User | null): boolean => {
@@ -469,14 +289,6 @@ export const resetStudentPassword = async (userId: string): Promise<boolean> => 
     }
 
     console.log("[2] SUKSES! Database berhasil diubah:", data);
-
-    const localUsers = getLocalUsers();
-    const localIndex = localUsers.findIndex((u) => u.id === userId);
-    if (localIndex >= 0) {
-      localUsers[localIndex].password = hashedPassword;
-      setLocalUsers(localUsers);
-    }
-
     return true;
   } catch (err) {
     console.error('[X] Terjadi kesalahan sistem:', err);

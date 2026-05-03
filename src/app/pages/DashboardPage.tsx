@@ -1,10 +1,10 @@
 import { Link, useNavigate } from 'react-router';
 import { BookOpen, CheckCircle, HelpCircle, LogOut, Lock, Target, Trophy, User, Users, ArrowRight, ClipboardList, X, ChevronRight, Award } from 'lucide-react';
 import { getAllStudents, getCurrentUser, logout } from '../utils/auth';
+import { getAllGroupAssignments } from '../utils/groups';
 import {
   getAllProgress,
   getGlobalTestProgress,
-  isLessonUnlocked,
   isGlobalPosttestUnlocked,
   LessonProgress,
   GlobalTestProgress,
@@ -32,7 +32,6 @@ import {
 } from '../components/ui/dialog';
 import { Header } from '../components/layout/Header';
 
-const GROUP_STORAGE_KEY = 'student-groups';
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -46,6 +45,37 @@ export function DashboardPage() {
   });
   const [globalPosttestUnlocked, setGlobalPosttestUnlocked] = useState(false);
   const [lessonUnlockMap, setLessonUnlockMap] = useState<Record<string, boolean>>({});
+
+  const buildLessonUnlockMap = useCallback((allProgress: LessonProgress[], globalProg: GlobalTestProgress) => {
+    const map: Record<string, boolean> = {};
+    const lessonIds = Object.keys(lessons).sort((a, b) => Number(a) - Number(b));
+
+    for (const lessonId of lessonIds) {
+      if (!globalProg.globalPretestCompleted) {
+        map[lessonId] = false;
+        continue;
+      }
+
+      if (lessonId === '1') {
+        map[lessonId] = true;
+        continue;
+      }
+
+      const prevLessonId = String(Number(lessonId) - 1);
+      const prevLesson = lessons[prevLessonId];
+      const prevProgress = allProgress.find((item) => item.lessonId === prevLessonId);
+
+      map[lessonId] = Boolean(
+        prevLesson &&
+        prevProgress?.pretestCompleted &&
+        prevProgress.completedStages.length >= prevLesson.stages.length &&
+        prevProgress.posttestCompleted,
+      );
+    }
+
+    return map;
+  }, []);
+
   const loadDashboardData = useCallback(async () => {
     if (!user) return;
     const [prog, globalProg, globalUnlocked] = await Promise.all([
@@ -56,11 +86,8 @@ export function DashboardPage() {
     setProgress(prog);
     setGlobalTestProgress(globalProg);
     setGlobalPosttestUnlocked(globalUnlocked);
-    const unlockEntries = await Promise.all(
-      Object.keys(lessons).map(async (id) => [id, await isLessonUnlocked(user.id, id)] as [string, boolean])
-    );
-    setLessonUnlockMap(Object.fromEntries(unlockEntries));
-  }, [user]);
+    setLessonUnlockMap(buildLessonUnlockMap(prog, globalProg));
+  }, [buildLessonUnlockMap, user]);
 
   useEffect(() => {
     if (!user) {
@@ -74,7 +101,7 @@ export function DashboardPage() {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const [isGroupOpen, setIsGroupOpen] = useState(false);
-  const [groupVersion, setGroupVersion] = useState(0);
+  const [groupAssignments, setGroupAssignments] = useState<Record<string, string>>({});
 
   const [mainTab, setMainTab] = useState<'kegiatan' | 'hasil'>('kegiatan');
 
@@ -94,22 +121,18 @@ export function DashboardPage() {
     score: number,
   ) => setReviewModal({ title, questions, studentAnswers, score });
 
-  const groupAssignments = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem(GROUP_STORAGE_KEY) || '{}') as Record<string, string>;
-    } catch (error) {
-      console.error('Error parsing group assignments from localStorage:', error);
-      return {} as Record<string, string>;
-    }
-  }, [groupVersion]);
+  useEffect(() => {
+    if (!isGroupOpen || !user) return;
+    getAllGroupAssignments().then(setGroupAssignments);
+  }, [isGroupOpen, user]);
 
   const selectedGroup = user ? groupAssignments[user.id] || '' : '';
 
   const [allStudents, setAllStudents] = useState<Awaited<ReturnType<typeof getAllStudents>>>([]);
   useEffect(() => {
-    if (!user) return;
+    if (!isGroupOpen || !user) return;
     getAllStudents().then(setAllStudents);
-  }, [user]);
+  }, [isGroupOpen, user]);
 
   const studentsInSelectedGroup = useMemo(() => {
     if (!selectedGroup) return [];
@@ -245,24 +268,43 @@ export function DashboardPage() {
         {mainTab === 'kegiatan' && (
           <>
             {/* Compact Pre-Test Umum strip */}
-            <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-[#C4B5FD]/60 bg-gradient-to-r from-[#F5F3FF] to-[#EDE9FE] px-5 py-4 shadow-sm">
+            <div className={`mb-6 flex items-center justify-between gap-4 rounded-2xl border px-5 py-4 shadow-sm transition-all ${
+              globalTestProgress.globalPretestCompleted 
+                ? 'border-[#10B981]/30 bg-gradient-to-r from-[#F0FDF4] to-[#DCFCE7]' 
+                : 'border-[#C4B5FD]/60 bg-gradient-to-r from-[#F5F3FF] to-[#EDE9FE]'
+            }`}>
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#7C3AED]/15 text-[#7C3AED]">
-                  <Trophy className="h-5 w-5" />
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                  globalTestProgress.globalPretestCompleted ? 'bg-[#10B981] text-white shadow-lg shadow-[#10B981]/20' : 'bg-[#7C3AED]/15 text-[#7C3AED]'
+                }`}>
+                  {globalTestProgress.globalPretestCompleted ? <CheckCircle className="h-5 w-5" /> : <Trophy className="h-5 w-5" />}
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-[#3B1F6E]">Pre-Test Umum</p>
-                  <p className="text-xs text-[#3B1F6E]/55 font-medium">
-                    {globalTestProgress.globalPretestCompleted ? 'Sudah dikerjakan' : 'Belum dikerjakan — kerjakan sebelum memulai pertemuan'}
+                  <div className="flex items-center gap-2">
+                    <p className={`text-sm font-black ${globalTestProgress.globalPretestCompleted ? 'text-[#065F46]' : 'text-[#3B1F6E]'}`}>Pre-Test Umum</p>
+                    {globalTestProgress.globalPretestCompleted && (
+                      <span className="text-[10px] font-black bg-[#10B981] text-white px-2 py-0.5 rounded-full uppercase tracking-tighter">Selesai</span>
+                    )}
+                  </div>
+                  <p className={`text-xs font-medium ${globalTestProgress.globalPretestCompleted ? 'text-[#065F46]/60' : 'text-[#3B1F6E]/55'}`}>
+                    {globalTestProgress.globalPretestCompleted 
+                      ? `Nilai: ${globalTestProgress.globalPretestScore}/${globalPretest.questions.length}` 
+                      : 'Belum dikerjakan — kerjakan sebelum memulai pertemuan'}
                   </p>
                 </div>
               </div>
-              <Link
-                to="/global-pretest"
-                className="shrink-0 rounded-xl bg-[#7C3AED] px-5 py-2 text-xs font-bold text-white shadow-md transition-all hover:bg-[#6D28D9] active:scale-95"
-              >
-                {globalTestProgress.globalPretestCompleted ? 'Tinjau' : 'Mulai Pre-Test'}
-              </Link>
+              {globalTestProgress.globalPretestCompleted ? (
+                <div className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#10B981]/10 border border-[#10B981]/20 text-[#059669] text-xs font-black uppercase tracking-tighter">
+                  Sudah Mengerjakan <CheckCircle className="w-3.5 h-3.5" />
+                </div>
+              ) : (
+                <Link
+                  to="/global-pretest"
+                  className="shrink-0 rounded-xl bg-[#7C3AED] px-5 py-2 text-xs font-bold text-white shadow-md transition-all hover:bg-[#6D28D9] active:scale-95"
+                >
+                  Mulai Pre-Test
+                </Link>
+              )}
             </div>
 
             {/* Lesson grid */}
@@ -373,28 +415,43 @@ export function DashboardPage() {
         </div>
 
             {/* Compact Post-Test Umum strip */}
-            <div className={`flex items-center justify-between gap-4 rounded-2xl border border-[#FCD34D]/50 bg-gradient-to-r from-[#FFFBEB] to-[#FEF3C7] px-5 py-4 ${!globalPosttestUnlocked ? 'opacity-50' : ''}`}>
+            <div className={`mb-6 flex items-center justify-between gap-4 rounded-2xl border px-5 py-4 shadow-sm transition-all ${
+              globalTestProgress.globalPosttestCompleted 
+                ? 'border-[#FCD34D]/50 bg-gradient-to-r from-[#FFFBEB] to-[#FEF3C7]' 
+                : 'border-[#FCD34D]/30 bg-gray-50'
+            } ${!globalPosttestUnlocked && !globalTestProgress.globalPosttestCompleted ? 'opacity-50' : ''}`}>
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F59E0B]/15 text-[#D97706]">
-                  <Trophy className="h-5 w-5" />
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                  globalTestProgress.globalPosttestCompleted ? 'bg-[#F59E0B] text-white shadow-lg shadow-[#F59E0B]/20' : 'bg-[#F59E0B]/15 text-[#D97706]'
+                }`}>
+                  {globalTestProgress.globalPosttestCompleted ? <CheckCircle className="h-5 w-5" /> : <Trophy className="h-5 w-5" />}
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-[#92400E]">Post-Test Umum</p>
-                  <p className="text-xs text-[#92400E]/55 font-medium">
+                  <div className="flex items-center gap-2">
+                    <p className={`text-sm font-black ${globalTestProgress.globalPosttestCompleted ? 'text-[#92400E]' : 'text-[#3B1F6E]'}`}>Post-Test Umum</p>
+                    {globalTestProgress.globalPosttestCompleted && (
+                      <span className="text-[10px] font-black bg-[#F59E0B] text-white px-2 py-0.5 rounded-full uppercase tracking-tighter">Selesai</span>
+                    )}
+                  </div>
+                  <p className={`text-xs font-medium ${globalTestProgress.globalPosttestCompleted ? 'text-[#92400E]/60' : 'text-[#92400E]/55'}`}>
                     {globalTestProgress.globalPosttestCompleted
-                      ? 'Sudah dikerjakan'
+                      ? `Nilai: ${globalTestProgress.globalPosttestScore}/${globalPosttest.questions.length}`
                       : globalPosttestUnlocked
                       ? 'Siap dikerjakan — selesaikan evaluasi akhir Anda'
                       : 'Selesaikan semua pertemuan terlebih dahulu'}
                   </p>
                 </div>
               </div>
-              {globalPosttestUnlocked ? (
+              {globalTestProgress.globalPosttestCompleted ? (
+                <div className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/20 text-[#92400E] text-xs font-black uppercase tracking-tighter">
+                  Sudah Mengerjakan <CheckCircle className="w-3.5 h-3.5" />
+                </div>
+              ) : globalPosttestUnlocked ? (
                 <Link
                   to="/global-posttest"
                   className="shrink-0 rounded-xl bg-[#F59E0B] px-5 py-2 text-xs font-bold text-white shadow-md transition-all hover:bg-[#D97706] active:scale-95"
                 >
-                  {globalTestProgress.globalPosttestCompleted ? 'Tinjau' : 'Mulai Post-Test'}
+                  Mulai Post-Test
                 </Link>
               ) : (
                 <div className="shrink-0 rounded-xl bg-gray-200 px-5 py-2 text-xs font-bold text-gray-400 cursor-not-allowed">
